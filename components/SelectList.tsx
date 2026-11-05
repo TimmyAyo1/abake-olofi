@@ -24,7 +24,7 @@ export function SelectList({ items, action }: { items: Pick[]; action: (fd: Form
       <input type="hidden" name="back" value="/manage" />
       {Array.from(sel).map((id) => <input key={id} type="hidden" name="ids" value={id} />)}
 
-      <div className="row-btns" style={{ alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button type="button" className="btn quiet sm" onClick={() => setSel(all ? new Set() : new Set(items.map((i) => i.id)))}>{all ? "Clear all" : "Select all"}</button>
         {dupes.length ? <button type="button" className="btn quiet sm" onClick={() => setSel(new Set(dupes))}>Select repeats ({dupes.length})</button> : null}
       </div>
@@ -43,23 +43,29 @@ export function SelectList({ items, action }: { items: Pick[]; action: (fd: Form
         ))}
       </div>
 
-      <div style={{ position: "sticky", bottom: 84, background: "var(--bg)", borderTop: "1px solid var(--rule)", padding: "12px 0", display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <span style={{ flex: 1 }}>{sel.size ? `${sel.size} selected` : "Tick the orders to delete"}</span>
-        {confirming && sel.size ? (
-          <>
-            <span className="hot small" style={{ flexBasis: "100%" }}>Delete {sel.size} order{sel.size > 1 ? "s" : ""} for good, with their updates, photos and payments? This can&apos;t be undone.</span>
-            <button type="button" className="btn quiet" onClick={() => setConfirming(false)}>Keep them</button>
-            <DeleteButton n={sel.size} />
-          </>
-        ) : (
-          <button type="button" className="btn danger" disabled={!sel.size} onClick={() => setConfirming(true)}>Delete selected</button>
-        )}
-      </div>
+      {sel.size ? (
+        <div className="selbar" role="region" aria-label="Selected orders">
+          {confirming ? (
+            <>
+              <span className="warn">Delete {sel.size} order{sel.size > 1 ? "s" : ""} for good, with their updates, photos and payments? This can&apos;t be undone.</span>
+              <span className="grow" />
+              <button type="button" className="btn quiet" onClick={() => setConfirming(false)}>Keep them</button>
+              <DeleteButton n={sel.size} />
+            </>
+          ) : (
+            <>
+              <span className="grow">{sel.size} selected</span>
+              <button type="button" className="btn quiet" onClick={() => setSel(new Set())}>Clear</button>
+              <button type="button" className="btn destroy" onClick={() => setConfirming(true)}>Delete {sel.size}</button>
+            </>
+          )}
+        </div>
+      ) : null}
     </form>
   );
 }
 
 function DeleteButton({ n }: { n: number }) {
   const { pending } = useFormStatus();
-  return <button type="submit" className="btn" style={{ background: "var(--bad)", borderColor: "var(--bad)", color: "#fff" }} disabled={pending}>{pending ? "Deleting…" : `Yes, delete ${n}`}</button>;
+  return <button type="submit" className="btn destroy" disabled={pending}>{pending ? "Deleting…" : `Yes, delete ${n}`}</button>;
 }

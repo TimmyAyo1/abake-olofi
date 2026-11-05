@@ -308,3 +308,47 @@ button:disabled { cursor: progress; }
 /* A slim bar at the top while a page is loading */
 .navbar-progress { position: fixed; top: 0; left: 0; height: 2px; background: var(--acc); z-index: 100; animation: navprog 1.2s ease-out forwards; }
 @keyframes navprog { from { width: 0; } to { width: 85%; } }
+
+/* ───────── Round 3: lighter type, centred pages, whole rows clickable ───────── */
+
+/* Lighter type. Bright stays only for the client's headline and the initials. */
+.page-title { font-family: var(--font-body), system-ui, sans-serif; font-weight: 600; font-size: 34px; letter-spacing: -0.025em; line-height: 1.1; }
+@media (max-width: 600px) { .page-title { font-size: 30px; } }
+.od-title { font-family: var(--font-body), system-ui, sans-serif; font-weight: 600; font-size: 30px; letter-spacing: -0.02em; line-height: 1.15; }
+.sheet-h h2 { font-family: var(--font-body), system-ui, sans-serif; font-weight: 600; font-size: 22px; letter-spacing: -0.015em; }
+.display { font-family: var(--font-body), system-ui, sans-serif; font-weight: 600; letter-spacing: -0.015em; }
+.date-big, .fact .v, .stat .v { font-family: var(--font-body), system-ui, sans-serif; font-weight: 500; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.date-big { font-size: 16px; }
+.fact .v { font-size: 17px; }
+.stat .v { font-size: 26px; }
+.orow-name { font-weight: 500; }
+.btn { font-weight: 500; }
+body { font-weight: 400; }
+
+/* Pages sit in the middle of the space instead of hugging the left edge. */
+.page { margin-inline: auto; width: 100%; }
+.od { margin-inline: auto; width: 100%; }
+
+/* The whole row is clickable, not just the name (no more cursor flicker across a row). */
+.orow { position: relative; }
+.orow > a.orow-main::after { content: ""; position: absolute; inset: 0; }
+.orow-end { position: relative; z-index: 1; }
+.orow:has(> a.orow-main):hover { background: var(--soft); box-shadow: -12px 0 0 var(--soft), 12px 0 0 var(--soft); }
+.orow:has(> a.orow-main):hover .orow-name { text-decoration: none; }
+a.orow:hover { background: var(--soft); box-shadow: -12px 0 0 var(--soft), 12px 0 0 var(--soft); }
+label.orow:hover { background: var(--soft); box-shadow: -12px 0 0 var(--soft), 12px 0 0 var(--soft); }
+.orow * { cursor: inherit; }
+a[href] *, button * { cursor: inherit; }
+
+/* Selection bar for bulk delete */
+.selbar {
+  position: sticky; bottom: 16px; z-index: 5; margin-top: 8px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--ink); color: var(--bg); border-radius: 10px; padding: 12px 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.18);
+}
+@media (max-width: 1023px) { .selbar { bottom: 92px; } }
+.selbar .grow { flex: 1; min-width: 140px; font-weight: 500; }
+.selbar .btn.quiet { color: var(--bg); border-color: color-mix(in srgb, var(--bg) 35%, transparent); background: transparent; }
+.btn.destroy { background: var(--bad); border-color: var(--bad); color: #fff; }
+.selbar .warn { flex-basis: 100%; font-size: 13px; opacity: .85; }
