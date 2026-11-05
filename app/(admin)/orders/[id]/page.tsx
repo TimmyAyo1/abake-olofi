@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import { getOrder, getSettings, getUpdates, getWeavers, signMedia, weaverLoad } from "@/lib/data";
 import { STAGES, money, stageIndex, stageLabel } from "@/lib/orders";
 import { addDays, daysLeft, longDate, naira, relativeDay, shortDate, timeAgo, today, waLink } from "@/lib/format";
@@ -9,9 +10,9 @@ import { Swatch } from "@/components/Swatch";
 import { SubmitButton } from "@/components/SubmitButton";
 import { MediaPicker } from "@/components/MediaPicker";
 import { CopyButton, DatePair, Reveal, SharePdf } from "@/components/Client";
-import { addPayment, advance, logUpdate, saveInvoiceTerms, toggleCancelled, toggleShared, undoStep } from "../actions";
+import { addPayment, advance, deleteOrders, logUpdate, saveInvoiceTerms, toggleCancelled, toggleShared, undoStep } from "../actions";
 
-type Search = { step?: string; log?: string; pay?: string; invoice?: string; more?: string };
+type Search = { step?: string; log?: string; pay?: string; invoice?: string; more?: string; delete?: string };
 
 export default async function OrderPage(props: { params: Promise<{ id: string }>; searchParams: Promise<Search> }) {
   const [params, searchParams] = await Promise.all([props.params, props.searchParams]);
@@ -24,7 +25,9 @@ export default async function OrderPage(props: { params: Promise<{ id: string }>
   const i = stageIndex(o.stage);
   const st = STAGES[i];
   const self = `/orders/${o.id}`;
-  const site = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+  // The client link uses NEXT_PUBLIC_SITE_URL if set, otherwise the address the app is being opened on.
+  const h = await headers();
+  const site = process.env.NEXT_PUBLIC_SITE_URL || `${h.get("x-forwarded-proto") ?? "https"}://${h.get("x-forwarded-host") ?? h.get("host") ?? ""}`;
   const trackUrl = `${site}/t/${o.track_token}`;
   const gallery = updates.flatMap((u) => u.media).filter((x) => urls[x.path]);
   const wa = waLink(o.client_phone);
@@ -133,6 +136,7 @@ export default async function OrderPage(props: { params: Promise<{ id: string }>
             <input type="hidden" name="cancel" value={o.cancelled ? "0" : "1"} />
             <SubmitButton className="btn danger sm block">{o.cancelled ? "Restore order" : "Cancel order"}</SubmitButton>
           </form>
+          <Link href={`${self}?delete=1`} className="btn quiet sm" scroll={false}>Delete order</Link>
         </div>
       </aside>
 
@@ -140,6 +144,16 @@ export default async function OrderPage(props: { params: Promise<{ id: string }>
       {searchParams.log ? <LogSheet o={o} kind={searchParams.log} settings={settings} closeHref={self} /> : null}
       {searchParams.pay ? <PaySheet o={o} closeHref={self} /> : null}
       {searchParams.invoice ? <InvoiceSheet o={o} settings={settings} closeHref={self} /> : null}
+      {searchParams.delete ? (
+        <Sheet title="Delete this order?" kicker={o.client_name} closeHref={self}>
+          <p style={{ margin: 0 }}>It&apos;s removed for good, with its updates, photos and payments. To keep it on record instead, use Cancel order.</p>
+          <form action={deleteOrders} className="row-btns">
+            <input type="hidden" name="ids" value={o.id} />
+            <Link href={self} className="btn quiet" scroll={false}>Keep it</Link>
+            <SubmitButton className="btn danger" pendingText="Deleting…">Delete for good</SubmitButton>
+          </form>
+        </Sheet>
+      ) : null}
     </div>
   );
 }

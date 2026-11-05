@@ -18,7 +18,10 @@ export default async function OrdersLayout({ children }: { children: React.React
     <div style={{ display: "flex", flexDirection: "column" }}>
       <div className="page-head">
         <h1 className="page-title">Orders</h1>
-        <Link href="/orders/new" className="btn">New order</Link>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Link href="/manage" className="btn quiet">Select</Link>
+          <Link href="/orders/new" className="btn">New order</Link>
+        </div>
       </div>
       <p className="mut" style={{ margin: "10px 0 0", fontSize: 14 }}>
         {live.length} live{toCall ? ` · ${toCall} weaver${toCall > 1 ? "s" : ""} to call` : ""}{owed ? ` · ${owed} balance${owed > 1 ? "s" : ""} owed` : ""}

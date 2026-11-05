@@ -7,6 +7,7 @@ import type { Order, Template } from "@/lib/types";
 import { LinesEditor } from "./LinesEditor";
 import { MediaPicker } from "./MediaPicker";
 import { SubmitButton } from "./SubmitButton";
+import { useFormStatus } from "react-dom";
 
 type Props = {
   action: (fd: FormData) => void;
@@ -22,6 +23,8 @@ type Props = {
 export function OrderForm({ action, templates = [], order, repeatOf }: Props) {
   const base: Partial<Order> = order ?? repeatOf ?? {};
   const editing = !!order;
+  // One key per form: if it's submitted twice, the server keeps only the first order.
+  const [formKey] = useState(() => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Date.now()) + Math.random()));
   const [tpl, setTpl] = useState<string>("");
   const t = templates.find((x) => x.id === tpl);
   const [title, setTitle] = useState(base.title ?? "");
@@ -36,6 +39,7 @@ export function OrderForm({ action, templates = [], order, repeatOf }: Props) {
 
   return (
     <form action={action} className="stack">
+      {!editing ? <input type="hidden" name="client_key" value={formKey} /> : null}
       {order ? <input type="hidden" name="id" value={order.id} /> : null}
       {t?.weaver_cost ? <input type="hidden" name="weaver_cost" value={t.weaver_cost} /> : null}
 
@@ -101,10 +105,20 @@ export function OrderForm({ action, templates = [], order, repeatOf }: Props) {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <button type="submit" name="intent" value="invoice" className="btn block">Save and send invoice</button>
-          <button type="submit" name="intent" value="talking" className="btn ghost block">Save, still talking</button>
+          <IntentButtons />
         </div>
       )}
     </form>
+  );
+}
+
+/** Both save buttons lock while the order is being saved. */
+function IntentButtons() {
+  const { pending } = useFormStatus();
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <button type="submit" name="intent" value="invoice" className="btn block" disabled={pending}>{pending ? "Saving…" : "Save and send invoice"}</button>
+      <button type="submit" name="intent" value="talking" className="btn ghost block" disabled={pending}>Save, still talking</button>
+    </div>
   );
 }

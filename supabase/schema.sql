@@ -210,3 +210,8 @@ grant execute on function public.take_invoice_no(uuid) to authenticated;
 -- 003
 -- Weavers can be taken off the active list without losing their history.
 alter table public.weavers add column if not exists active boolean not null default true;
+
+
+-- 004
+-- Each new-order form carries a one-time key, so a double tap can never create two orders.
+alter table public.orders add column if not exists client_key text unique;

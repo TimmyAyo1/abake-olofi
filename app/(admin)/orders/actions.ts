@@ -86,6 +86,12 @@ function refresh(id?: string) {
 
 export async function createOrder(fd: FormData) {
   const { supabase, uid } = await me();
+  const key = str(fd.get("client_key")) || null;
+  if (key) {
+    // Already saved from this same form (double tap, slow connection): open that order instead.
+    const { data: existing } = await supabase.from("orders").select("id").eq("client_key", key).maybeSingle();
+    if (existing) redirect(`/orders/${existing.id}`);
+  }
   const ref = await nextRef();
   const media = readMedia(fd);
   const intent = str(fd.get("intent")); // "invoice" | "talking"
@@ -104,10 +110,22 @@ export async function createOrder(fd: FormData) {
     invoiced_at: intent === "invoice" ? today() : null,
     cover_path: media.find((m) => m.type === "image")?.path ?? null,
     created_by: uid,
+    client_key: key,
   };
   if (!row.client_name) throw new Error("Add the client's name.");
-  const { data, error } = await supabase.from("orders").insert(row).select("id").single();
-  if (error) throw new Error(error.message);
+  let { data, error } = await supabase.from("orders").insert(row).select("id").single();
+  if (error && /client_key/.test(error.message)) {
+    // Database not updated yet (migration 004): save without the key rather than fail.
+    const { client_key: _k, ...rest } = row;
+    ({ data, error } = await supabase.from("orders").insert(rest).select("id").single());
+  }
+  if (error || !data) {
+    if (error?.code === "23505" && key) {
+      const { data: existing } = await supabase.from("orders").select("id").eq("client_key", key).maybeSingle();
+      if (existing) redirect(`/orders/${existing.id}`);
+    }
+    throw new Error(error?.message ?? "Could not save the order.");
+  }
   await addUpdate(data.id, "stage", `New order from ${row.source ?? "a client"}`, { media });
   if (intent === "invoice") { await takeInvoiceNo(data.id); await addUpdate(data.id, "stage", "Invoice sent"); }
   refresh();
@@ -297,4 +315,21 @@ export async function saveInvoiceTerms(fd: FormData) {
   await takeInvoiceNo(id);
   refresh(id);
   redirect(`/orders/${id}?invoice=1`);
+}
+
+// ───────── delete
+
+/** Permanently deletes the chosen orders with their updates and payments. */
+export async function deleteOrders(fd: FormData) {
+  const { supabase } = await me();
+  const ids = fd.getAll("ids").map(String).filter((x) => /^[0-9a-f-]{36}$/i.test(x));
+  if (ids.length) {
+    const { data: ups } = await supabase.from("order_updates").select("media").in("order_id", ids);
+    const paths = (ups ?? []).flatMap((u: { media: Media[] }) => (u.media ?? []).map((m) => m.path));
+    const { error } = await supabase.from("orders").delete().in("id", ids);
+    if (error) throw new Error(error.message);
+    if (paths.length) await supabase.storage.from("media").remove(paths);
+  }
+  refresh();
+  redirect(str(fd.get("back")) || "/orders");
 }
