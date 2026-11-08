@@ -3,14 +3,14 @@ import { createClient } from "@/lib/supabase/server";
 import { SubmitButton } from "@/components/SubmitButton";
 import { Sheet } from "@/components/Sheet";
 import { shortDate, today } from "@/lib/format";
-import { addWeaver, renameWeaver, setWeaverActive } from "./actions";
+import { addWeaver, deleteWeaver, renameWeaver, setWeaverActive } from "./actions";
 
 export const metadata = { title: "Weavers" };
 
 type W = { id: string; name: string; active: boolean };
 type O = { id: string; client_name: string; title: string | null; weaver_id: string | null; weaver_promised: string | null; next_call: string | null };
 
-export default async function WeaversPage(props: { searchParams: Promise<{ edit?: string; add?: string }> }) {
+export default async function WeaversPage(props: { searchParams: Promise<{ edit?: string; add?: string; err?: string; del?: string }> }) {
   const sp = await props.searchParams;
   const supabase = await createClient();
   const [{ data: ws }, { data: os }] = await Promise.all([
@@ -62,7 +62,7 @@ export default async function WeaversPage(props: { searchParams: Promise<{ edit?
           <div className="label mut" style={{ paddingBottom: 6 }}>Not active</div>
           {resting.map((w) => (
             <div className="kv" key={w.id}>
-              <span className="mut">{w.name}</span>
+              <Link href={`/weavers?edit=${w.id}`} className="mut">{w.name}</Link>
               <form action={setWeaverActive}><input type="hidden" name="id" value={w.id} /><input type="hidden" name="active" value="1" /><button className="linkbtn small">Make active</button></form>
             </div>
           ))}
@@ -90,7 +90,21 @@ export default async function WeaversPage(props: { searchParams: Promise<{ edit?
             <input type="hidden" name="active" value="0" />
             <SubmitButton className="btn quiet block">Take off the active list</SubmitButton>
           </form>
-          <p className="mut small" style={{ margin: 0 }}>Their past orders stay as they are.</p>
+          <p className="mut small" style={{ margin: 0 }}>Taking them off the active list hides them when handing over orders. Their past orders stay as they are.</p>
+          {sp.err ? <p className="error" style={{ margin: 0 }}>{sp.err}</p> : null}
+          {sp.del ? (
+            <form action={deleteWeaver} className="box" style={{ borderColor: "var(--bad)" }}>
+              <input type="hidden" name="id" value={editing.id} />
+              <strong>Delete {editing.name} for good?</strong>
+              <span className="mut small">Past orders they wove will no longer show a weaver name. This can&apos;t be undone.</span>
+              <div className="row-btns">
+                <Link href={`/weavers?edit=${editing.id}`} className="btn quiet">Keep</Link>
+                <SubmitButton className="btn destroy" pendingText="Deleting…">Delete</SubmitButton>
+              </div>
+            </form>
+          ) : (
+            <Link href={`/weavers?edit=${editing.id}&del=1`} className="btn danger block">Delete weaver</Link>
+          )}
         </Sheet>
       ) : null}
     </div>

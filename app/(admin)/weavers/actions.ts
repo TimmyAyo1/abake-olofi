@@ -31,3 +31,14 @@ export async function setWeaverActive(fd: FormData) {
   revalidatePath("/weavers");
   redirect("/weavers");
 }
+
+/** Removes a weaver for good. Not allowed while they still have orders on the loom. */
+export async function deleteWeaver(fd: FormData) {
+  const supabase = await createClient();
+  const id = str(fd.get("id"));
+  const { count } = await supabase.from("orders").select("id", { count: "exact", head: true }).eq("weaver_id", id).eq("stage", "weaving").eq("cancelled", false);
+  if (count) redirect(`/weavers?edit=${id}&err=${encodeURIComponent(`They still have ${count} order${count > 1 ? "s" : ""} on the loom. Finish or move ${count > 1 ? "those" : "it"} first, or take them off the active list instead.`)}`);
+  await supabase.from("weavers").delete().eq("id", id);
+  revalidatePath("/weavers");
+  redirect("/weavers");
+}
