@@ -22,7 +22,7 @@ export function Sidebar({ name }: { name: string }) {
   return (
     <aside className="sidebar">
       <Link href="/orders" className="brand logo" aria-label="Àbáké Olófì home">
-        <img src="/logo.png" alt="Àbáké Olófì" className="logo-img" />
+        <><img src="/logo.svg" alt="Àbáké Olófì" className="logo-img logo-light" /><img src="/logo-dark.svg" alt="" aria-hidden="true" className="logo-img logo-dark" /></>
       </Link>
       {ITEMS.map((i) => (
         <Link key={i.href} href={i.href} className="navlink" aria-current={active(i.href)}>
@@ -39,7 +39,7 @@ export function TopBar() {
   return (
     <header className="topbar">
       <Link href="/orders" className="logo" aria-label="Àbáké Olófì home">
-        <img src="/logo.png" alt="Àbáké Olófì" className="logo-img" />
+        <><img src="/logo.svg" alt="Àbáké Olófì" className="logo-img logo-light" /><img src="/logo-dark.svg" alt="" aria-hidden="true" className="logo-img logo-dark" /></>
       </Link>
       <Link href="/settings" className="btn quiet sm" aria-label="Settings">Settings</Link>
     </header>

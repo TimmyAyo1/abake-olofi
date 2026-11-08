@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { CLIENT_STEPS, linesTotal, stageIndex } from "@/lib/orders";
+import { CLIENT_STEPS, bankFor, linesTotal, stageIndex } from "@/lib/orders";
 import { longDate, naira, shortDate, waLink } from "@/lib/format";
-import type { Media, Order, OrderUpdate, Payment, Settings } from "@/lib/types";
+import type { Bank, Media, Order, OrderUpdate, Payment, Settings } from "@/lib/types";
 import { CopyButton } from "@/components/Client";
 import { SubmitButton } from "@/components/SubmitButton";
 import { sendFeedback } from "./actions";
@@ -27,11 +27,11 @@ export default async function TrackPage(props: { params: Promise<{ token: string
   // Only the fields a client may see. Never the weaver, costs or private notes.
   const { data: o } = await db
     .from("orders")
-    .select("id, ref, client_name, title, colourway, lines, discount, stage, cancelled, deposit_at, weaving_at, ready_at, delivered_at, client_promised, client_date_note, cover_path, feedback_at")
+    .select("id, ref, client_name, title, colourway, lines, discount, bank_account_id, stage, cancelled, deposit_at, weaving_at, ready_at, delivered_at, client_promised, client_date_note, cover_path, feedback_at")
     .eq("track_token", params.token)
     .maybeSingle();
   if (!o || o.cancelled) notFound();
-  const order = o as Pick<Order, "id" | "ref" | "client_name" | "title" | "colourway" | "lines" | "discount" | "stage" | "cancelled" | "deposit_at" | "weaving_at" | "ready_at" | "delivered_at" | "client_promised" | "client_date_note" | "cover_path" | "feedback_at">;
+  const order = o as Pick<Order, "id" | "ref" | "client_name" | "title" | "colourway" | "lines" | "discount" | "bank_account_id" | "stage" | "cancelled" | "deposit_at" | "weaving_at" | "ready_at" | "delivered_at" | "client_promised" | "client_date_note" | "cover_path" | "feedback_at">;
 
   const [{ data: ups }, { data: pays }, { data: settings }] = await Promise.all([
     db.from("order_updates").select("id, body, media, created_at").eq("order_id", order.id).eq("shared", true).order("created_at", { ascending: false }),
@@ -39,7 +39,9 @@ export default async function TrackPage(props: { params: Promise<{ token: string
     db.from("settings").select("biz_name, address, phone, handle, bank_name, account_name, account_number").eq("id", 1).maybeSingle(),
   ]);
   const updates = (ups ?? []) as Pick<OrderUpdate, "id" | "body" | "media" | "created_at">[];
-  const s = (settings ?? {}) as Partial<Settings>;
+  const { data: bankRows } = await db.from("bank_accounts").select("id, bank_name, account_name, account_number, is_default").order("created_at");
+  const bank = bankFor(order, (bankRows ?? []) as Bank[]);
+  const s = { ...((settings ?? {}) as Partial<Settings>), ...(bank ? { bank_name: bank.bank_name, account_name: bank.account_name, account_number: bank.account_number } : {}) };
 
   const paths = [order.cover_path, ...updates.flatMap((u) => (u.media as Media[]).map((m) => m.path))].filter((p): p is string => !!p);
   const urls: Record<string, string> = {};
@@ -62,7 +64,7 @@ export default async function TrackPage(props: { params: Promise<{ token: string
   return (
     <main className="track">
       <header className="track-head">
-        <span className="logo"><img src="/logo.png" alt="Àbáké Olófì" className="logo-img" /></span>
+        <span className="logo"><><img src="/logo.svg" alt="Àbáké Olófì" className="logo-img logo-light" /><img src="/logo-dark.svg" alt="" aria-hidden="true" className="logo-img logo-dark" /></></span>
         <span className="label mut">{order.ref}</span>
       </header>
 

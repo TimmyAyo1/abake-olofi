@@ -33,7 +33,7 @@ const s = StyleSheet.create({
   page: { fontFamily: "Inter", color: INK, paddingTop: 64, paddingBottom: 56, paddingHorizontal: 58, fontSize: 9 },
   top: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   title: { fontSize: 32, fontWeight: 700, letterSpacing: 5 },
-  logo: { width: 104, height: 104 },
+  logo: { width: 96, height: 106 }, // Asset 10 is 1526 × 1683
   meta: { flexDirection: "row", justifyContent: "space-between", marginTop: 34 },
   label: { fontSize: 8, fontWeight: 700, letterSpacing: 1.2 },
   client: { fontSize: 12.5, fontWeight: 600, letterSpacing: 1.6, marginTop: 4 },
@@ -119,7 +119,7 @@ function InvoiceDoc({ o, settings, logo }: { o: OrderFull; settings: Settings; l
           ) : null}
           {paid > 0 ? (
             <>
-              <View style={s.tRow}><Text style={s.tLabel}>AMOUNT PAID</Text><Text style={s.tValue}>{n(paid)}</Text></View>
+              <View style={s.tRow}><Text style={s.tLabel}>{o.payments.filter((p) => p.direction === "in").every((p) => p.kind === "deposit") ? "DEPOSIT PAID" : "AMOUNT PAID"}</Text><Text style={s.tValue}>{n(paid)}</Text></View>
               <View style={s.tRow}><Text style={s.tLabel}>{m.balance > 0 ? "BALANCE DUE" : "BALANCE"}</Text><Text style={s.tValue}>{m.balance > 0 ? n(m.balance) : "PAID"}</Text></View>
             </>
           ) : (

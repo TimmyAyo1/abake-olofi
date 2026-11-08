@@ -308,12 +308,16 @@ export async function saveInvoiceTerms(fd: FormData) {
   const { supabase } = await me();
   const id = str(fd.get("id"));
   const dep = str(fd.get("deposit_due"));
+  const bank = str(fd.get("bank_account_id"));
   const { error } = await supabase.from("orders").update({
     discount: num(fd.get("discount")),
     deposit_due: dep ? num(dep) : null,
+    ...(bank ? { bank_account_id: bank } : {}),
   }).eq("id", id);
   if (error) {
-    const msg = /discount|deposit_due|column/i.test(error.message)
+    const msg = /bank_account_id/i.test(error.message)
+      ? "The database needs updating first: run supabase/migrations/005_bank_accounts.sql in the Supabase SQL Editor."
+      : /discount|deposit_due|column/i.test(error.message)
       ? "The database needs updating first: run supabase/migrations/002_invoice.sql in the Supabase SQL Editor."
       : `Couldn't save: ${error.message}`;
     redirect(`/orders/${id}?invoice=1&err=${encodeURIComponent(msg)}`);
@@ -338,4 +342,24 @@ export async function deleteOrders(fd: FormData) {
   }
   refresh();
   redirect(str(fd.get("back")) || "/orders");
+}
+
+/** "Yes, the deposit is paid" from the invoice: records it and moves the order on if it was still waiting. */
+export async function recordDepositForInvoice(fd: FormData) {
+  const { supabase } = await me();
+  const id = str(fd.get("id"));
+  const amount = num(fd.get("amount"));
+  const date = str(fd.get("date")) || today();
+  const media = readMedia(fd);
+  const { data: o } = await supabase.from("orders").select("stage, invoiced_at").eq("id", id).single();
+  if (amount > 0) {
+    await supabase.from("payments").insert({ order_id: id, direction: "in", amount, paid_on: date, kind: "deposit", proof_path: media[0]?.path ?? null });
+    await addUpdate(id, "payment", `Deposit received · ₦${amount.toLocaleString("en-NG")}`, { media });
+  }
+  if (o && (o.stage === "enquiry" || o.stage === "invoiced")) {
+    await supabase.from("orders").update({ stage: "deposit", deposit_at: date, invoiced_at: o.invoiced_at ?? date }).eq("id", id);
+  }
+  await takeInvoiceNo(id);
+  refresh(id);
+  redirect(`/orders/${id}?invoice=1`);
 }

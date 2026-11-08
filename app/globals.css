@@ -356,3 +356,20 @@ a[href] *, button * { cursor: inherit; }
 /* order page side actions: a tidy column of normal-height buttons */
 .side-actions { display: flex; flex-direction: column; gap: 8px; }
 .side-actions > * { width: 100%; }
+
+/* Designer's logo: Asset 10 (all orange) on light, Asset 11 (orange + white) on dark */
+.logo-dark { display: none; }
+:root[data-theme="dark"] .logo-light { display: none; }
+:root[data-theme="dark"] .logo-dark { display: block; }
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] .logo-light { display: none; }
+  :root[data-theme="system"] .logo-dark { display: block; }
+}
+.invoice-preview { background: #fff; color: #141211; }
+.invoice-preview .mut { color: #6b6460; }
+.invoice-preview .kv { border-top-color: #ece8e4; }
+.invoice-preview .kv:first-of-type { border-top-color: #141211; }
+
+/* big tappable choices (deposit question) */
+.choice { display: flex; flex-direction: column; gap: 4px; padding: 16px; border: 1px solid var(--field-line); border-radius: 10px; }
+.choice:hover { border-color: var(--ink); background: var(--soft); }

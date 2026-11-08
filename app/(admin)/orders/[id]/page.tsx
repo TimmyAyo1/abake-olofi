@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
-import { getOrder, getSettings, getUpdates, getWeavers, signMedia, weaverLoad } from "@/lib/data";
-import { STAGES, money, stageIndex, stageLabel } from "@/lib/orders";
+import { getBanks, getOrder, getSettings, getUpdates, getWeavers, signMedia, weaverLoad } from "@/lib/data";
+import { STAGES, bankFor, money, stageIndex, stageLabel, withBank } from "@/lib/orders";
 import { addDays, daysLeft, longDate, naira, relativeDay, shortDate, timeAgo, today, waLink } from "@/lib/format";
 import type { OrderFull, OrderUpdate, Settings } from "@/lib/types";
 import { Sheet } from "@/components/Sheet";
@@ -10,9 +10,9 @@ import { Swatch } from "@/components/Swatch";
 import { SubmitButton } from "@/components/SubmitButton";
 import { MediaPicker } from "@/components/MediaPicker";
 import { CopyButton, DatePair, Reveal, SharePdf } from "@/components/Client";
-import { addPayment, advance, deleteOrders, logUpdate, saveInvoiceTerms, toggleCancelled, toggleShared, undoStep } from "../actions";
+import { addPayment, advance, deleteOrders, recordDepositForInvoice, logUpdate, saveInvoiceTerms, toggleCancelled, toggleShared, undoStep } from "../actions";
 
-type Search = { step?: string; log?: string; pay?: string; invoice?: string; more?: string; delete?: string; err?: string; saved?: string };
+type Search = { step?: string; log?: string; pay?: string; invoice?: string; more?: string; delete?: string; err?: string; saved?: string; as?: string };
 
 export default async function OrderPage(props: { params: Promise<{ id: string }>; searchParams: Promise<Search> }) {
   const [params, searchParams] = await Promise.all([props.params, props.searchParams]);
@@ -143,7 +143,13 @@ export default async function OrderPage(props: { params: Promise<{ id: string }>
       {searchParams.step && st.action && !o.cancelled ? <StepSheet o={o} settings={settings} closeHref={self} /> : null}
       {searchParams.log ? <LogSheet o={o} kind={searchParams.log} settings={settings} closeHref={self} /> : null}
       {searchParams.pay ? <PaySheet o={o} closeHref={self} /> : null}
-      {searchParams.invoice ? <InvoiceSheet o={o} settings={settings} closeHref={self} err={searchParams.err} saved={!!searchParams.saved} /> : null}
+      {searchParams.invoice
+        ? m.paidIn > 0 || searchParams.as === "due"
+          ? <InvoiceSheet o={o} settings={settings} closeHref={self} err={searchParams.err} saved={!!searchParams.saved} />
+          : searchParams.as === "paid"
+            ? <DepositPaidSheet o={o} closeHref={self} />
+            : <DepositQuestion o={o} closeHref={self} />
+        : null}
       {searchParams.delete ? (
         <Sheet title="Delete this order?" kicker={o.client_name} closeHref={self}>
           <p style={{ margin: 0 }}>It&apos;s removed for good, with its updates, photos and payments. To keep it on record instead, use Cancel order.</p>
@@ -399,9 +405,11 @@ function PaySheet({ o, closeHref }: { o: OrderFull; closeHref: string }) {
   );
 }
 
-function InvoiceSheet({ o, settings, closeHref, err, saved }: { o: OrderFull; settings: Settings; closeHref: string; err?: string; saved?: boolean }) {
+async function InvoiceSheet({ o, settings, closeHref, err, saved }: { o: OrderFull; settings: Settings; closeHref: string; err?: string; saved?: boolean }) {
   const m = money(o);
-  const st = settings;
+  const banks = await getBanks();
+  const chosen = bankFor(o, banks);
+  const st = withBank(settings, chosen);
   const no = m.invoiceNo ?? o.ref;
   const fmt = (v: number) => Math.round(v).toLocaleString("en-NG");
   const text = [
@@ -414,7 +422,7 @@ function InvoiceSheet({ o, settings, closeHref, err, saved }: { o: OrderFull; se
     `Subtotal: ${naira(m.subtotal)}`,
     m.discount ? `Discount: −${naira(m.discount)}` : "",
     m.discount ? `Total: ${naira(m.total)}` : "",
-    m.paidIn ? `Paid: ${naira(m.paidIn)}` : `Deposit due: ${naira(m.depositDue)}`,
+    m.paidIn ? `Deposit paid: ${naira(m.paidIn)}` : `Deposit due: ${naira(m.depositDue)}`,
     m.paidIn ? `Balance due: ${naira(m.balance)}` : `Balance on delivery: ${naira(m.total - m.depositDue)}`,
     "",
     st.account_number ? `Pay to: ${st.bank_name} · ${st.account_name} · ${st.account_number}` : "",
@@ -426,13 +434,13 @@ function InvoiceSheet({ o, settings, closeHref, err, saved }: { o: OrderFull; se
     <Sheet title={`Invoice ${no}`} kicker={o.client_name} closeHref={closeHref}>
       {err ? <p className="error" style={{ margin: 0, fontWeight: 600 }}>{err}</p> : null}
       {saved && !err ? <p className="mut" style={{ margin: 0 }}>Updated.</p> : null}
-      {!st.account_number ? <p className="error" style={{ margin: 0 }}>Add the bank details in Settings so they print on the invoice.</p> : null}
+      {!banks.length ? <p className="error" style={{ margin: 0 }}>Add a bank account in <Link href="/settings?bank=new" style={{ textDecoration: "underline" }}>Settings</Link> so it prints on the invoice.</p> : null}
       {!m.subtotal ? <p className="error" style={{ margin: 0 }}>No items yet. Use Edit details to add them.</p> : null}
 
       <div className="invoice-preview">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
           <div className="inv-title">INVOICE</div>
-          <img src="/logo.png" alt="Àbáké Olófì" width={64} height={64} />
+          <img src="/logo.svg" alt="Àbáké Olófì" style={{ height: 70, width: "auto" }} />
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
           <div><div className="inv-label">Issued to</div><div style={{ fontWeight: 600, letterSpacing: ".08em" }}>{o.client_name.toUpperCase()}</div></div>
@@ -458,7 +466,7 @@ function InvoiceSheet({ o, settings, closeHref, err, saved }: { o: OrderFull; se
           ) : null}
           {m.paidIn ? (
             <>
-              <div className="kv"><span className="inv-label">Amount paid</span><span className="num">{fmt(m.paidIn)}</span></div>
+              <div className="kv"><span className="inv-label">{o.payments.filter((p) => p.direction === "in").every((p) => p.kind === "deposit") ? "Deposit paid" : "Amount paid"}</span><span className="num">{fmt(m.paidIn)}</span></div>
               <div className="kv"><strong className="inv-label">Balance due</strong><strong className="num">{fmt(m.balance)}</strong></div>
             </>
           ) : (
@@ -468,10 +476,24 @@ function InvoiceSheet({ o, settings, closeHref, err, saved }: { o: OrderFull; se
             </>
           )}
         </div>
+        {st.account_number ? <div className="small"><span className="inv-label">Payment info</span><br />{st.bank_name} · {st.account_name}<br />Account No. <strong>{st.account_number}</strong></div> : null}
       </div>
 
       <form action={saveInvoiceTerms} className="grid2" style={{ alignItems: "end" }}>
         <input type="hidden" name="id" value={o.id} />
+        {banks.length ? (
+          <div className="field" style={{ gridColumn: "1 / -1" }}>
+            Pay into
+            <div className="chips">
+              {banks.map((b) => (
+                <label className="chip" key={b.id}>
+                  <input type="radio" name="bank_account_id" value={b.id} defaultChecked={chosen?.id === b.id} />
+                  <span>{b.bank_name} · {b.account_number.slice(-4)}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <label className="field">Discount (₦)<input name="discount" inputMode="numeric" defaultValue={m.discount || ""} /></label>
         <label className="field">Deposit due (₦) <span className="hint">empty = half</span><input name="deposit_due" inputMode="numeric" defaultValue={o.deposit_due ?? ""} placeholder={fmt(Math.round(m.total / 2))} /></label>
         <SubmitButton className="btn quiet" pendingText="Updating…">Update</SubmitButton>
@@ -486,6 +508,45 @@ function InvoiceSheet({ o, settings, closeHref, err, saved }: { o: OrderFull; se
         <CopyButton text={text} label="Copy as text" className="btn quiet sm" />
       </div>
       <p className="mut small" style={{ margin: 0 }}>On a phone, Share PDF opens the share sheet so she can send it straight to WhatsApp.</p>
+    </Sheet>
+  );
+}
+
+// ───────── Before the invoice: has the deposit been paid? (decides the invoice wording)
+
+function DepositQuestion({ o, closeHref }: { o: OrderFull; closeHref: string }) {
+  const m = money(o);
+  return (
+    <Sheet title="Has the deposit been paid?" kicker={`${o.client_name} · invoice`} closeHref={closeHref}>
+      <p className="mut" style={{ margin: 0 }}>This decides what the invoice says at the bottom.</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <Link href={`${closeHref}?invoice=1&as=due`} className="choice" scroll={false} replace>
+          <strong>Not yet, deposit is due</strong>
+          <span className="mut small">Shows &ldquo;Deposit due {naira(m.depositDue)}&rdquo; and &ldquo;Balance on delivery&rdquo;.</span>
+        </Link>
+        <Link href={`${closeHref}?invoice=1&as=paid`} className="choice" scroll={false} replace>
+          <strong>Yes, the deposit is paid</strong>
+          <span className="mut small">Records the payment, then shows &ldquo;Deposit paid&rdquo; and &ldquo;Balance due&rdquo;.</span>
+        </Link>
+      </div>
+    </Sheet>
+  );
+}
+
+function DepositPaidSheet({ o, closeHref }: { o: OrderFull; closeHref: string }) {
+  const m = money(o);
+  return (
+    <Sheet title="Record the deposit" kicker={`${o.client_name} · invoice`} closeHref={closeHref}>
+      <form action={recordDepositForInvoice} className="stack">
+        <input type="hidden" name="id" value={o.id} />
+        <div className="grid2">
+          <label className="field">Amount paid (₦)<input name="amount" inputMode="numeric" required defaultValue={m.depositDue || ""} /></label>
+          <label className="field">Date paid<input type="date" name="date" defaultValue={today()} required /></label>
+        </div>
+        <div className="field">Bank alert screenshot <span className="hint">optional</span><MediaPicker folder={`orders/${o.id}/payments`} label="Screenshot" max={1} /></div>
+        <SubmitButton className="btn block">Save and show the invoice</SubmitButton>
+        <Link href={`${closeHref}?invoice=1`} className="btn quiet block" scroll={false} replace>Back</Link>
+      </form>
     </Sheet>
   );
 }

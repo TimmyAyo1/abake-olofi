@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { Line, OrderFull, Stage } from "./types";
+import type { Bank, Line, OrderFull, Stage } from "./types";
 import { daysBetween, today } from "./format";
 
 export const STAGES: { id: Stage; label: string; action: string | null }[] = [
@@ -98,3 +98,13 @@ export function daysSince(d: string | null | undefined): number | null {
 }
 
 export const isLive = (o: OrderFull) => !o.cancelled && o.stage !== "delivered";
+
+/** The account this order's invoice asks to be paid into: the one chosen for it, else the default. */
+export function bankFor(o: { bank_account_id?: string | null }, banks: Bank[]): Bank | null {
+  return banks.find((b) => b.id === o.bank_account_id) ?? banks.find((b) => b.is_default) ?? banks[0] ?? null;
+}
+
+/** Puts that account's details into the settings used to print an invoice. */
+export function withBank<T extends { bank_name: string | null; account_name: string | null; account_number: string | null }>(s: T, b: Bank | null): T {
+  return b ? { ...s, bank_name: b.bank_name, account_name: b.account_name, account_number: b.account_number } : s;
+}

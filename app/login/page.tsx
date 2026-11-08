@@ -9,7 +9,7 @@ export default async function LoginPage(props: { searchParams: Promise<{ error?:
     <main style={{ minHeight: "100dvh", display: "grid", placeItems: "center", padding: 20 }}>
       <div style={{ width: "100%", maxWidth: 380, display: "flex", flexDirection: "column", gap: 24 }}>
         <div className="logo">
-          <img src="/logo.png" alt="Àbáké Olófì" className="logo-img" />
+          <><img src="/logo.svg" alt="Àbáké Olófì" className="logo-img logo-light" /><img src="/logo-dark.svg" alt="" aria-hidden="true" className="logo-img logo-dark" /></>
         </div>
         <h1 className="page-title">Sign in</h1>
         <form action={signIn} className="stack">

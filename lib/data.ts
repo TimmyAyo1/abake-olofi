@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "./supabase/server";
-import type { OrderFull, OrderUpdate, Settings, Template, Weaver } from "./types";
+import type { Bank, OrderFull, OrderUpdate, Settings, Template, Weaver } from "./types";
 
 const ORDER_SELECT = "*, weaver:weavers(id, name, phone), payments(*)";
 
@@ -79,4 +79,10 @@ export async function signMedia(paths: string[]): Promise<Record<string, string>
   const out: Record<string, string> = {};
   (data ?? []).forEach((d) => { if (d.path && d.signedUrl) out[d.path] = d.signedUrl; });
   return out;
+}
+
+export async function getBanks(): Promise<Bank[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("bank_accounts").select("id, bank_name, account_name, account_number, is_default").order("created_at");
+  return (data ?? []) as Bank[];
 }

@@ -19,6 +19,7 @@ export type Order = {
   invoice_no: number | null;
   discount: number;
   deposit_due: number | null;
+  bank_account_id: string | null;
   stage: Stage;
   cancelled: boolean;
   invoiced_at: string | null;
@@ -97,3 +98,5 @@ export type OrderFull = Order & {
   weaver: Weaver | null;
   payments: Payment[];
 };
+
+export type Bank = { id: string; bank_name: string; account_name: string | null; account_number: string; is_default: boolean };
