@@ -12,7 +12,7 @@ import { MediaPicker } from "@/components/MediaPicker";
 import { CopyButton, DatePair, Reveal, SharePdf } from "@/components/Client";
 import { addPayment, advance, deleteOrders, logUpdate, saveInvoiceTerms, toggleCancelled, toggleShared, undoStep } from "../actions";
 
-type Search = { step?: string; log?: string; pay?: string; invoice?: string; more?: string; delete?: string };
+type Search = { step?: string; log?: string; pay?: string; invoice?: string; more?: string; delete?: string; err?: string; saved?: string };
 
 export default async function OrderPage(props: { params: Promise<{ id: string }>; searchParams: Promise<Search> }) {
   const [params, searchParams] = await Promise.all([props.params, props.searchParams]);
@@ -125,7 +125,7 @@ export default async function OrderPage(props: { params: Promise<{ id: string }>
           </div>
         ) : null}
 
-        <div className="row-btns" style={{ flexDirection: "column" }}>
+        <div className="side-actions">
           <Link href={`${self}/edit`} className="btn quiet sm">Edit details</Link>
           <Link href={`/orders/new?repeat=${o.id}`} className="btn quiet sm">Repeat this order</Link>
           {i > 0 && !o.cancelled ? (
@@ -143,7 +143,7 @@ export default async function OrderPage(props: { params: Promise<{ id: string }>
       {searchParams.step && st.action && !o.cancelled ? <StepSheet o={o} settings={settings} closeHref={self} /> : null}
       {searchParams.log ? <LogSheet o={o} kind={searchParams.log} settings={settings} closeHref={self} /> : null}
       {searchParams.pay ? <PaySheet o={o} closeHref={self} /> : null}
-      {searchParams.invoice ? <InvoiceSheet o={o} settings={settings} closeHref={self} /> : null}
+      {searchParams.invoice ? <InvoiceSheet o={o} settings={settings} closeHref={self} err={searchParams.err} saved={!!searchParams.saved} /> : null}
       {searchParams.delete ? (
         <Sheet title="Delete this order?" kicker={o.client_name} closeHref={self}>
           <p style={{ margin: 0 }}>It&apos;s removed for good, with its updates, photos and payments. To keep it on record instead, use Cancel order.</p>
@@ -399,7 +399,7 @@ function PaySheet({ o, closeHref }: { o: OrderFull; closeHref: string }) {
   );
 }
 
-function InvoiceSheet({ o, settings, closeHref }: { o: OrderFull; settings: Settings; closeHref: string }) {
+function InvoiceSheet({ o, settings, closeHref, err, saved }: { o: OrderFull; settings: Settings; closeHref: string; err?: string; saved?: boolean }) {
   const m = money(o);
   const st = settings;
   const no = m.invoiceNo ?? o.ref;
@@ -423,6 +423,8 @@ function InvoiceSheet({ o, settings, closeHref }: { o: OrderFull; settings: Sett
 
   return (
     <Sheet title={`Invoice ${no}`} kicker={o.client_name} closeHref={closeHref}>
+      {err ? <p className="error" style={{ margin: 0, fontWeight: 600 }}>{err}</p> : null}
+      {saved && !err ? <p className="mut" style={{ margin: 0 }}>Updated.</p> : null}
       {!st.account_number ? <p className="error" style={{ margin: 0 }}>Add the bank details in Settings so they print on the invoice.</p> : null}
       {!m.subtotal ? <p className="error" style={{ margin: 0 }}>No items yet. Use Edit details to add them.</p> : null}
 

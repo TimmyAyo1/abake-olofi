@@ -352,3 +352,7 @@ a[href] *, button * { cursor: inherit; }
 .selbar .btn.quiet { color: var(--bg); border-color: color-mix(in srgb, var(--bg) 35%, transparent); background: transparent; }
 .btn.destroy { background: var(--bad); border-color: var(--bad); color: #fff; }
 .selbar .warn { flex-basis: 100%; font-size: 13px; opacity: .85; }
+
+/* order page side actions: a tidy column of normal-height buttons */
+.side-actions { display: flex; flex-direction: column; gap: 8px; }
+.side-actions > * { width: 100%; }
