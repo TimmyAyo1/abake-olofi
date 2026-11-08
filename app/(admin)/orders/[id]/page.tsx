@@ -412,7 +412,8 @@ function InvoiceSheet({ o, settings, closeHref, err, saved }: { o: OrderFull; se
     ...o.lines.map((l) => (l.heading && !l.unit ? `\n*${l.desc}*` : `• ${l.desc}${(l.qty || 1) > 1 ? ` × ${l.qty}` : ""}: ${naira((l.qty || 1) * l.unit)}`)),
     "",
     `Subtotal: ${naira(m.subtotal)}`,
-    m.discount ? `Discount: ${naira(m.discount)}` : "",
+    m.discount ? `Discount: −${naira(m.discount)}` : "",
+    m.discount ? `Total: ${naira(m.total)}` : "",
     m.paidIn ? `Paid: ${naira(m.paidIn)}` : `Deposit due: ${naira(m.depositDue)}`,
     m.paidIn ? `Balance due: ${naira(m.balance)}` : `Balance on delivery: ${naira(m.total - m.depositDue)}`,
     "",
@@ -449,7 +450,12 @@ function InvoiceSheet({ o, settings, closeHref, err, saved }: { o: OrderFull; se
             )
           )}
           <div className="kv"><strong className="inv-label">Subtotal</strong><strong className="num">{fmt(m.subtotal)}</strong></div>
-          {m.discount ? <div className="kv"><span className="inv-label">Discount</span><span className="num">{fmt(m.discount)}</span></div> : null}
+          {m.discount ? (
+            <>
+              <div className="kv"><span className="inv-label">Discount</span><span className="num">−{fmt(m.discount)}</span></div>
+              <div className="kv"><strong className="inv-label">Total</strong><strong className="num">{fmt(m.total)}</strong></div>
+            </>
+          ) : null}
           {m.paidIn ? (
             <>
               <div className="kv"><span className="inv-label">Amount paid</span><span className="num">{fmt(m.paidIn)}</span></div>

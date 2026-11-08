@@ -111,7 +111,12 @@ function InvoiceDoc({ o, settings, logo }: { o: OrderFull; settings: Settings; l
             <Text style={[s.label, { letterSpacing: 1.4 }]}>SUBTOTAL</Text>
             <Text style={s.tValue}>{n(m.subtotal)}</Text>
           </View>
-          {m.discount ? <View style={s.tRow}><Text style={s.tLabel}>DISCOUNT</Text><Text style={s.tValue}>{n(m.discount)}</Text></View> : null}
+          {m.discount ? (
+            <>
+              <View style={s.tRow}><Text style={s.tLabel}>DISCOUNT</Text><Text style={s.tValue}>−{n(m.discount)}</Text></View>
+              <View style={[s.tRow, { marginTop: 10, paddingTop: 8, borderTopWidth: 0.6, borderTopColor: INK, alignSelf: "flex-end", width: 310 }]}><Text style={[s.tLabel, { width: 200 }]}>TOTAL</Text><Text style={[s.tValue, { fontWeight: 700 }]}>{n(m.total)}</Text></View>
+            </>
+          ) : null}
           {paid > 0 ? (
             <>
               <View style={s.tRow}><Text style={s.tLabel}>AMOUNT PAID</Text><Text style={s.tValue}>{n(paid)}</Text></View>
