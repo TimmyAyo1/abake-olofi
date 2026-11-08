@@ -481,6 +481,7 @@ async function InvoiceSheet({ o, settings, closeHref, err, saved }: { o: OrderFu
 
       <form action={saveInvoiceTerms} className="grid2" style={{ alignItems: "end" }}>
         <input type="hidden" name="id" value={o.id} />
+        <input type="hidden" name="as" value="due" />
         {banks.length ? (
           <div className="field" style={{ gridColumn: "1 / -1" }}>
             Pay into

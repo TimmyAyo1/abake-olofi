@@ -1,5 +1,6 @@
 import { Sidebar, TabBar, TopBar } from "@/components/Nav";
 import { NavProgress } from "@/components/NavProgress";
+import { EnterToDone } from "@/components/EnterToDone";
 import { getMe } from "@/lib/data";
 import { signOut } from "../login/actions";
 
@@ -22,6 +23,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="shell">
       <NavProgress />
+      <EnterToDone />
       <Sidebar name={me?.name ?? ""} />
       <TopBar />
       <div className="main">{children}</div>

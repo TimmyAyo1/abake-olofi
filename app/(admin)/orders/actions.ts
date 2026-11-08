@@ -309,6 +309,8 @@ export async function saveInvoiceTerms(fd: FormData) {
   const id = str(fd.get("id"));
   const dep = str(fd.get("deposit_due"));
   const bank = str(fd.get("bank_account_id"));
+  // Stay on the invoice after Update (don't bounce back to the "deposit paid?" question).
+  const keep = str(fd.get("as")) === "due" ? "&as=due" : "";
   const { error } = await supabase.from("orders").update({
     discount: num(fd.get("discount")),
     deposit_due: dep ? num(dep) : null,
@@ -320,11 +322,11 @@ export async function saveInvoiceTerms(fd: FormData) {
       : /discount|deposit_due|column/i.test(error.message)
       ? "The database needs updating first: run supabase/migrations/002_invoice.sql in the Supabase SQL Editor."
       : `Couldn't save: ${error.message}`;
-    redirect(`/orders/${id}?invoice=1&err=${encodeURIComponent(msg)}`);
+    redirect(`/orders/${id}?invoice=1${keep}&err=${encodeURIComponent(msg)}`);
   }
   await takeInvoiceNo(id);
   refresh(id);
-  redirect(`/orders/${id}?invoice=1&saved=1`);
+  redirect(`/orders/${id}?invoice=1${keep}&saved=1`);
 }
 
 // ───────── delete
