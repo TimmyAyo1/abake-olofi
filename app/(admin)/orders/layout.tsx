@@ -65,11 +65,17 @@ function Row({ o, group, cover }: { o: OrderFull; group: string; cover: string |
     );
     end = wa ? <a className="btn ghost sm" href={`${wa}?text=${text}`} target="_blank" rel="noopener noreferrer">Remind</a> : null;
   } else if (group === "call") {
-    sub = `${o.weaver?.name ?? "Weaver"} · ${o.last_call ? `last call ${relativeDay(o.last_call)}` : "no call yet"}`;
+    const dueShares = (o.assignments ?? []).filter((a) => !a.received_at && a.next_call && a.next_call <= today());
+    const names = dueShares.length ? dueShares.map((a) => a.weaver?.name ?? "Weaver").join(" & ") : o.weaver?.name ?? "Weaver";
+    sub = `${names} · ${o.last_call ? `last call ${relativeDay(o.last_call)}` : "no call yet"}`;
     end = <Link className="btn ghost sm" href={`${href}?log=weaver`}>Called</Link>;
   } else if (group === "handover") {
     sub = `Deposit paid ${relativeDay(o.deposit_at)}`;
     end = <Link className="btn ghost sm" href={`${href}?step=1`}>Hand over</Link>;
+  } else if (group === "ready" && money(o).balance > 0) {
+    // Back in the shop: the balance must come in before it goes out.
+    sub = `Collect ${naira(money(o).balance)} before delivery`;
+    end = <Link className="btn sm" href="/money">Ask for balance</Link>;
   } else if (group === "weaving" || group === "ready") {
     sub = [o.title, group === "weaving" && o.next_call ? `next call ${relativeDay(o.next_call)}` : null].filter(Boolean).join(" · ");
     const late = o.client_promised && o.client_promised < today();

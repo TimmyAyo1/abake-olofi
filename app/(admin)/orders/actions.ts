@@ -178,18 +178,40 @@ export async function advance(fd: FormData) {
   }
 
   if (from === "deposit") {
-    const newName = str(fd.get("weaver_new"));
-    const weaverId = newName ? await ensureWeaver(newName, "") : str(fd.get("weaver_id")) || null;
-    if (!weaverId) throw new Error("Pick a weaver.");
-    const { data: w } = await supabase.from("weavers").select("name").eq("id", weaverId).single();
-    const wp = str(fd.get("weaver_promised"));
-    const cp = str(fd.get("client_promised"));
+    // One row per weaver: who, which invoice lines, and the date they gave.
+    const ids = fd.getAll("a_weaver").map(String);
+    const news = fd.getAll("a_new").map((v) => String(v).trim());
+    const items = fd.getAll("a_items").map(String);
+    const dates = fd.getAll("a_date").map(String);
+    const lines = (o.lines ?? []) as Line[];
     const firstCall = str(fd.get("next_call")) || addDays(today(), 3);
+    const rows: { weaver_id: string; name: string; line_idx: number[]; date: string }[] = [];
+    for (let k = 0; k < Math.max(ids.length, news.length); k++) {
+      const wid = news[k] ? await ensureWeaver(news[k], "") : ids[k];
+      if (!wid) continue;
+      const { data: w } = await supabase.from("weavers").select("name").eq("id", wid).single();
+      const idx = (items[k] ?? "").split(",").filter(Boolean).map(Number);
+      rows.push({ weaver_id: wid, name: w?.name ?? "the weaver", line_idx: idx, date: dates[k] ?? "" });
+    }
+    if (!rows.length) throw new Error("Pick a weaver.");
+    const describe = (idx: number[]) => idx.map((x) => lines[x]?.desc).filter(Boolean).join(", ");
+    const { error: aErr } = await supabase.from("order_assignments").insert(
+      rows.map((r) => ({
+        order_id: id, weaver_id: r.weaver_id, line_idx: r.line_idx,
+        items: rows.length === 1 && r.line_idx.length === lines.filter((l) => !l.heading || l.unit).length ? (o.title ?? describe(r.line_idx)) : describe(r.line_idx),
+        weaver_promised: r.date || null, next_call: firstCall,
+      }))
+    );
+    // Before migration 006 only one weaver can be saved; keep working with the first.
+    if (aErr && !/order_assignments/.test(aErr.message)) throw new Error(aErr.message);
+    const wp = rows.map((r) => r.date).filter(Boolean).sort().pop() ?? "";
+    const cp = str(fd.get("client_promised"));
     Object.assign(patch, {
-      stage: "weaving", weaving_at: today(), weaver_id: weaverId,
+      stage: "weaving", weaving_at: today(), weaver_id: rows[0].weaver_id,
       weaver_promised: wp || null, client_promised: cp || null, next_call: firstCall,
     });
-    await addUpdate(id, "stage", `Handed to ${w?.name ?? "the weaver"} · weaver's date ${shortDate(wp)} · client told ${shortDate(cp)}`);
+    const who = rows.map((r) => `${r.name}${rows.length > 1 && r.line_idx.length ? ` (${describe(r.line_idx)})` : ""}${rows.length > 1 && r.date ? ` by ${shortDate(r.date)}` : ""}`).join(" · ");
+    await addUpdate(id, "stage", `Handed to ${who}${rows.length === 1 ? ` · weaver's date ${shortDate(wp)}` : ""} · client told ${shortDate(cp)}`);
     await addUpdate(id, "client", "Weaving has started.", { shared: true });
   }
 
@@ -198,6 +220,7 @@ export async function advance(fd: FormData) {
     if (paid > 0) await supabase.from("payments").insert({ order_id: id, direction: "out", amount: paid, paid_on: date, kind: "weaver" });
     const media = readMedia(fd);
     Object.assign(patch, { stage: "ready", ready_at: date, next_call: null });
+    await supabase.from("order_assignments").update({ received_at: date, next_call: null }).eq("order_id", id).is("received_at", null);
     await addUpdate(id, "stage", `Received from the weaver${str(fd.get("note")) ? ` · ${str(fd.get("note"))}` : ""}`, { media, shared: fd.get("shared") === "on" });
     await setCoverIfMissing(id, media);
   }
@@ -250,11 +273,17 @@ export async function logUpdate(fd: FormData) {
   let body = str(fd.get("body"));
   const patch: Record<string, unknown> = {};
 
+  const aId = str(fd.get("assignment_id"));
   if (kind === "weaver") {
     body = body || "Called the weaver";
     patch.last_call = today();
-    const next = str(fd.get("next_call_pick")) || str(fd.get("next_call"));
-    patch.next_call = next || addDays(today(), 3);
+    const next = str(fd.get("next_call_pick")) || str(fd.get("next_call")) || addDays(today(), 3);
+    patch.next_call = next;
+    if (aId) {
+      const { data: a } = await supabase.from("order_assignments").update({ last_call: today(), next_call: next }).eq("id", aId).select("weaver:weavers(name)").single();
+      const name = (a as { weaver?: { name?: string } } | null)?.weaver?.name;
+      if (name && !str(fd.get("body"))) body = `Called ${name}`;
+    }
   }
 
   if (fd.get("date_changed") === "on") {
@@ -262,7 +291,10 @@ export async function logUpdate(fd: FormData) {
     const cp = str(fd.get("client_promised"));
     const note = str(fd.get("client_date_note"));
     const { data: o } = await supabase.from("orders").select("weaver_promised, client_promised").eq("id", id).single();
-    if (wp && wp !== o?.weaver_promised) { patch.weaver_promised = wp; body += `${body ? ". " : ""}Weaver's new date ${shortDate(wp)}`; }
+    if (wp && aId) {
+      await supabase.from("order_assignments").update({ weaver_promised: wp }).eq("id", aId);
+      body += `${body ? ". " : ""}Weaver's new date ${shortDate(wp)}`;
+    } else if (wp && wp !== o?.weaver_promised) { patch.weaver_promised = wp; body += `${body ? ". " : ""}Weaver's new date ${shortDate(wp)}`; }
     if (cp && cp !== o?.client_promised) {
       patch.client_promised = cp;
       patch.client_date_note = note || null;
@@ -272,6 +304,7 @@ export async function logUpdate(fd: FormData) {
 
   if (body || media.length) await addUpdate(id, kind, body, { media, shared: fd.get("shared") === "on" });
   if (Object.keys(patch).length) await supabase.from("orders").update(patch).eq("id", id);
+  if (aId) await syncFromShares(id);
   await setCoverIfMissing(id, media);
   refresh(id);
   redirect(`/orders/${id}`);
@@ -364,4 +397,40 @@ export async function recordDepositForInvoice(fd: FormData) {
   await takeInvoiceNo(id);
   refresh(id);
   redirect(`/orders/${id}?invoice=1`);
+}
+
+// ───────── split across weavers
+
+/** Keeps the order's own dates in step with its weavers' shares. */
+async function syncFromShares(orderId: string) {
+  const { supabase } = await me();
+  const { data } = await supabase.from("order_assignments").select("weaver_promised, next_call, last_call, received_at").eq("order_id", orderId);
+  const open = (data ?? []).filter((a) => !a.received_at);
+  if (!data?.length) return;
+  const min = (xs: (string | null)[]) => xs.filter(Boolean).sort()[0] ?? null;
+  const max = (xs: (string | null)[]) => xs.filter(Boolean).sort().pop() ?? null;
+  await supabase.from("orders").update({
+    next_call: min(open.map((a) => a.next_call)),
+    last_call: max(data.map((a) => a.last_call)),
+    weaver_promised: max(data.map((a) => a.weaver_promised)),
+  }).eq("id", orderId);
+}
+
+/** One weaver has delivered their share. When the last one is in, the order is ready. */
+export async function receiveShare(fd: FormData) {
+  const { supabase } = await me();
+  const id = str(fd.get("id"));
+  const aId = str(fd.get("assignment_id"));
+  const { data: a } = await supabase.from("order_assignments").update({ received_at: today(), next_call: null }).eq("id", aId).select("items, weaver:weavers(name)").single();
+  const name = (a as { weaver?: { name?: string } } | null)?.weaver?.name ?? "the weaver";
+  await addUpdate(id, "stage", `Received from ${name}${a?.items ? ` · ${a.items}` : ""}`);
+  const { data: rest } = await supabase.from("order_assignments").select("id").eq("order_id", id).is("received_at", null);
+  if (!rest?.length) {
+    await supabase.from("orders").update({ stage: "ready", ready_at: today(), next_call: null }).eq("id", id).eq("stage", "weaving");
+    await addUpdate(id, "client", "All pieces are back from the loom. Your aso-oke is ready!", { shared: true });
+  } else {
+    await syncFromShares(id);
+  }
+  refresh(id);
+  redirect(`/orders/${id}`);
 }

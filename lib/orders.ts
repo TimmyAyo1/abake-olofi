@@ -88,7 +88,7 @@ export function groupOrders(orders: OrderFull[]): Group[] {
     { key: "call", label: "Weavers to call today", hot: true, orders: callToday.sort((a, b) => (a.next_call ?? "").localeCompare(b.next_call ?? "")) },
     { key: "handover", label: "Deposit paid · hand to weaver", orders: live.filter((o) => o.stage === "deposit") },
     { key: "weaving", label: "With weaver", orders: live.filter((o) => o.stage === "weaving" && !callIds.has(o.id)).sort(byDate) },
-    { key: "ready", label: "Ready to deliver", orders: live.filter((o) => o.stage === "ready").sort(byDate) },
+    { key: "ready", label: "Ready in the shop", hot: true, orders: live.filter((o) => o.stage === "ready").sort(byDate) },
     { key: "owed", label: "Delivered · balance owed", orders: live.filter((o) => o.stage === "delivered" && money(o).balance > 0) },
   ].filter((g) => g.orders.length > 0);
 }

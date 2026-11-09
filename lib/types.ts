@@ -97,6 +97,22 @@ export type Settings = {
 export type OrderFull = Order & {
   weaver: Weaver | null;
   payments: Payment[];
+  assignments: Assignment[];
+};
+
+/** One weaver's share of an order. */
+export type Assignment = {
+  id: string;
+  order_id: string;
+  weaver_id: string | null;
+  weaver: Weaver | null;
+  items: string | null;
+  line_idx: number[];
+  weaver_promised: string | null;
+  next_call: string | null;
+  last_call: string | null;
+  received_at: string | null;
+  created_at: string;
 };
 
 export type Bank = { id: string; bank_name: string; account_name: string | null; account_number: string; is_default: boolean };

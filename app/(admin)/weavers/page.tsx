@@ -13,12 +13,28 @@ type O = { id: string; client_name: string; title: string | null; weaver_id: str
 export default async function WeaversPage(props: { searchParams: Promise<{ edit?: string; add?: string; err?: string; del?: string }> }) {
   const sp = await props.searchParams;
   const supabase = await createClient();
-  const [{ data: ws }, { data: os }] = await Promise.all([
+  const [{ data: ws }, shares] = await Promise.all([
     supabase.from("weavers").select("id, name, active").order("name"),
-    supabase.from("orders").select("id, client_name, title, weaver_id, weaver_promised, next_call").eq("stage", "weaving").eq("cancelled", false),
+    // Each weaver's share still on the loom (an order split across weavers shows under each of them).
+    supabase
+      .from("order_assignments")
+      .select("weaver_id, items, weaver_promised, next_call, received_at, order:orders!inner(id, client_name, title, stage, cancelled)")
+      .is("received_at", null)
+      .eq("order.stage", "weaving")
+      .eq("order.cancelled", false),
   ]);
   const weavers = (ws ?? []) as W[];
-  const orders = (os ?? []) as O[];
+  let orders: O[];
+  if (!shares.error) {
+    type S = { weaver_id: string | null; items: string | null; weaver_promised: string | null; next_call: string | null; order: { id: string; client_name: string; title: string | null } };
+    orders = ((shares.data ?? []) as unknown as S[]).map((a) => ({
+      id: a.order.id, client_name: a.order.client_name, title: a.items || a.order.title,
+      weaver_id: a.weaver_id, weaver_promised: a.weaver_promised, next_call: a.next_call,
+    }));
+  } else {
+    const { data: os } = await supabase.from("orders").select("id, client_name, title, weaver_id, weaver_promised, next_call").eq("stage", "weaving").eq("cancelled", false);
+    orders = (os ?? []) as O[];
+  }
   const byWeaver = (id: string) => orders.filter((o) => o.weaver_id === id).sort((a, b) => (a.weaver_promised ?? "").localeCompare(b.weaver_promised ?? ""));
   const active = weavers.filter((w) => w.active).sort((a, b) => byWeaver(b.id).length - byWeaver(a.id).length || a.name.localeCompare(b.name));
   const resting = weavers.filter((w) => !w.active);
@@ -47,7 +63,7 @@ export default async function WeaversPage(props: { searchParams: Promise<{ edit?
                 </span>
               </div>
               {list.map((o) => (
-                <Link key={o.id} href={`/orders/${o.id}`} className="kv" style={{ borderTopColor: "var(--line)" }}>
+                <Link key={o.id + (o.title ?? "")} href={`/orders/${o.id}`} className="kv" style={{ borderTopColor: "var(--line)" }}>
                   <span>{o.client_name}{o.title ? <span className="mut"> · {o.title}</span> : null}</span>
                   <span className={`small ${o.weaver_promised && o.weaver_promised < t ? "hot" : "mut"}`}>due {shortDate(o.weaver_promised)}</span>
                 </Link>

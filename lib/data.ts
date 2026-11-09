@@ -2,23 +2,32 @@ import "server-only";
 import { createClient } from "./supabase/server";
 import type { Bank, OrderFull, OrderUpdate, Settings, Template, Weaver } from "./types";
 
-const ORDER_SELECT = "*, weaver:weavers(id, name, phone), payments(*)";
+const ORDER_SELECT = "*, weaver:weavers(id, name, phone), payments(*), assignments:order_assignments(*, weaver:weavers(id, name, phone))";
+const ORDER_SELECT_OLD = "*, weaver:weavers(id, name, phone), payments(*)"; // before migration 006
+
+function tidy(o: OrderFull): OrderFull {
+  const a = (o.assignments ?? []).slice().sort((x, y) => x.created_at.localeCompare(y.created_at));
+  return { ...o, assignments: a };
+}
 
 export async function getOrders(): Promise<OrderFull[]> {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("orders")
-    .select(ORDER_SELECT)
-    .order("created_at", { ascending: false });
+  let { data, error } = await supabase.from("orders").select(ORDER_SELECT).order("created_at", { ascending: false });
+  if (error && /order_assignments/.test(error.message)) {
+    ({ data, error } = await supabase.from("orders").select(ORDER_SELECT_OLD).order("created_at", { ascending: false }));
+  }
   if (error) throw new Error(error.message);
-  return (data ?? []) as unknown as OrderFull[];
+  return ((data ?? []) as unknown as OrderFull[]).map(tidy);
 }
 
 export async function getOrder(id: string): Promise<OrderFull | null> {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("orders").select(ORDER_SELECT).eq("id", id).maybeSingle();
+  let { data, error } = await supabase.from("orders").select(ORDER_SELECT).eq("id", id).maybeSingle();
+  if (error && /order_assignments/.test(error.message)) {
+    ({ data, error } = await supabase.from("orders").select(ORDER_SELECT_OLD).eq("id", id).maybeSingle());
+  }
   if (error) throw new Error(error.message);
-  return (data as unknown as OrderFull) ?? null;
+  return data ? tidy(data as unknown as OrderFull) : null;
 }
 
 export async function getUpdates(orderId: string): Promise<OrderUpdate[]> {
@@ -50,9 +59,20 @@ export async function getWeavers(): Promise<Weaver[]> {
 /** weaver id → number of orders on their loom right now. */
 export async function weaverLoad(): Promise<Record<string, number>> {
   const supabase = await createClient();
-  const { data } = await supabase.from("orders").select("weaver_id").eq("stage", "weaving").eq("cancelled", false);
   const out: Record<string, number> = {};
-  (data ?? []).forEach((r: { weaver_id: string | null }) => { if (r.weaver_id) out[r.weaver_id] = (out[r.weaver_id] ?? 0) + 1; });
+  // Each weaver's share still on the loom (an order split across weavers counts once for each of them).
+  const { data, error } = await supabase
+    .from("order_assignments")
+    .select("weaver_id, received_at, orders!inner(stage, cancelled)")
+    .is("received_at", null)
+    .eq("orders.stage", "weaving")
+    .eq("orders.cancelled", false);
+  if (!error) {
+    (data ?? []).forEach((r: { weaver_id: string | null }) => { if (r.weaver_id) out[r.weaver_id] = (out[r.weaver_id] ?? 0) + 1; });
+    return out;
+  }
+  const { data: old } = await supabase.from("orders").select("weaver_id").eq("stage", "weaving").eq("cancelled", false);
+  (old ?? []).forEach((r: { weaver_id: string | null }) => { if (r.weaver_id) out[r.weaver_id] = (out[r.weaver_id] ?? 0) + 1; });
   return out;
 }
 

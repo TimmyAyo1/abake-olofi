@@ -36,7 +36,9 @@ export async function setWeaverActive(fd: FormData) {
 export async function deleteWeaver(fd: FormData) {
   const supabase = await createClient();
   const id = str(fd.get("id"));
-  const { count } = await supabase.from("orders").select("id", { count: "exact", head: true }).eq("weaver_id", id).eq("stage", "weaving").eq("cancelled", false);
+  const { count: c1 } = await supabase.from("orders").select("id", { count: "exact", head: true }).eq("weaver_id", id).eq("stage", "weaving").eq("cancelled", false);
+  const { count: c2 } = await supabase.from("order_assignments").select("id, orders!inner(stage)", { count: "exact", head: true }).eq("weaver_id", id).is("received_at", null).eq("orders.stage", "weaving");
+  const count = Math.max(c1 ?? 0, c2 ?? 0);
   if (count) redirect(`/weavers?edit=${id}&err=${encodeURIComponent(`They still have ${count} order${count > 1 ? "s" : ""} on the loom. Finish or move ${count > 1 ? "those" : "it"} first, or take them off the active list instead.`)}`);
   await supabase.from("weavers").delete().eq("id", id);
   revalidatePath("/weavers");

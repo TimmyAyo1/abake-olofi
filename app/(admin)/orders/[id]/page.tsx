@@ -10,9 +10,10 @@ import { Swatch } from "@/components/Swatch";
 import { SubmitButton } from "@/components/SubmitButton";
 import { MediaPicker } from "@/components/MediaPicker";
 import { CopyButton, DatePair, Reveal, SharePdf } from "@/components/Client";
-import { addPayment, advance, deleteOrders, recordDepositForInvoice, logUpdate, saveInvoiceTerms, toggleCancelled, toggleShared, undoStep } from "../actions";
+import { WeaverSplit } from "@/components/WeaverSplit";
+import { addPayment, advance, deleteOrders, receiveShare, recordDepositForInvoice, logUpdate, saveInvoiceTerms, toggleCancelled, toggleShared, undoStep } from "../actions";
 
-type Search = { step?: string; log?: string; pay?: string; invoice?: string; more?: string; delete?: string; err?: string; saved?: string; as?: string };
+type Search = { step?: string; log?: string; pay?: string; invoice?: string; more?: string; delete?: string; err?: string; saved?: string; as?: string; split?: string; a?: string };
 
 export default async function OrderPage(props: { params: Promise<{ id: string }>; searchParams: Promise<Search> }) {
   const [params, searchParams] = await Promise.all([props.params, props.searchParams]);
@@ -63,10 +64,21 @@ export default async function OrderPage(props: { params: Promise<{ id: string }>
             {STAGES.map((s, k) => <i key={s.id} className={k <= i ? "on" : ""} />)}
           </div>
           <Facts o={o} />
+          {o.stage === "ready" && m.balance > 0 ? (
+            <div className="box" style={{ borderColor: "var(--acc)", background: "var(--acc-soft)" }}>
+              <strong>Collect {naira(m.balance)} before sending it out</strong>
+              <span className="small">It&apos;s back from the weaver. Ask for the balance, record it with + Payment, then deliver.</span>
+              <div className="row-btns">
+                {wa ? <a className="btn sm" href={`${wa}?text=${encodeURIComponent(`Hello ${o.client_name}, good news from Àbáké Olófì: ${o.title ? `your ${o.title}` : "your aso-oke"} is ready! Please send the balance of ${naira(m.balance)} and we'll send it out to you right away. Thank you!`)}`} target="_blank" rel="noopener noreferrer">Ask for balance on WhatsApp</a> : <Link href="/money" className="btn sm">Copy a reminder</Link>}
+                <Link href={`${self}?pay=1`} className="btn quiet sm" scroll={false}>Record payment</Link>
+              </div>
+            </div>
+          ) : null}
+          {!o.cancelled && o.stage === "weaving" && o.assignments.length > 1 ? <Shares o={o} self={self} /> : null}
           {!o.cancelled ? (
             <div className="row-btns">
-              {o.stage === "weaving" ? <Link href={`${self}?log=weaver`} className="btn" scroll={false}>I&apos;ve called the weaver</Link> : null}
-              {st.action ? <Link href={`${self}?step=1`} className={o.stage === "weaving" ? "btn ghost" : "btn"} scroll={false}>{st.action}</Link> : null}
+              {o.stage === "weaving" && o.assignments.length <= 1 ? <Link href={`${self}?log=weaver`} className="btn" scroll={false}>I&apos;ve called the weaver</Link> : null}
+              {st.action && !(o.stage === "weaving" && o.assignments.length > 1) ? <Link href={`${self}?step=1`} className={o.stage === "weaving" ? "btn ghost" : "btn"} scroll={false}>{st.action}</Link> : null}
             </div>
           ) : null}
         </div>
@@ -140,8 +152,8 @@ export default async function OrderPage(props: { params: Promise<{ id: string }>
         </div>
       </aside>
 
-      {searchParams.step && st.action && !o.cancelled ? <StepSheet o={o} settings={settings} closeHref={self} /> : null}
-      {searchParams.log ? <LogSheet o={o} kind={searchParams.log} settings={settings} closeHref={self} /> : null}
+      {searchParams.step && st.action && !o.cancelled ? <StepSheet o={o} settings={settings} closeHref={self} split={searchParams.split} /> : null}
+      {searchParams.log ? <LogSheet o={o} kind={searchParams.log} settings={settings} closeHref={self} share={searchParams.a} /> : null}
       {searchParams.pay ? <PaySheet o={o} closeHref={self} /> : null}
       {searchParams.invoice
         ? m.paidIn > 0 || searchParams.as === "due"
@@ -235,7 +247,24 @@ function Post({ u, urls, orderId }: { u: OrderUpdate; urls: Record<string, strin
 
 // ───────── Sheets
 
-function StepSheet({ o, settings, closeHref }: { o: OrderFull; settings: Settings; closeHref: string }) {
+function StepSheet({ o, settings, closeHref, split }: { o: OrderFull; settings: Settings; closeHref: string; split?: string }) {
+  if (o.stage === "deposit" && split !== "0" && split !== "1") {
+    // First: one weaver, or split between several?
+    return (
+      <Sheet title="Hand over to weaver" kicker={`${o.client_name}${o.title ? ` · ${o.title}` : ""}`} closeHref={closeHref}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <Link href={`${closeHref}?step=1&split=0`} className="choice" scroll={false} replace>
+            <strong>One weaver</strong>
+            <span className="mut small">The whole order goes to one weaver.</span>
+          </Link>
+          <Link href={`${closeHref}?step=1&split=1`} className="choice" scroll={false} replace>
+            <strong>Split between weavers</strong>
+            <span className="mut small">Different items go to different weavers, each with their own date.</span>
+          </Link>
+        </div>
+      </Sheet>
+    );
+  }
   const m = money(o);
   const t = today();
   const st = STAGES[stageIndex(o.stage)];
@@ -268,7 +297,7 @@ function StepSheet({ o, settings, closeHref }: { o: OrderFull; settings: Setting
           </>
         ) : null}
 
-        {o.stage === "deposit" ? <HandOver o={o} settings={settings} /> : null}
+        {o.stage === "deposit" ? <HandOver o={o} settings={settings} multi={split === "1"} /> : null}
 
         {o.stage === "weaving" ? (
           <>
@@ -300,35 +329,31 @@ function StepSheet({ o, settings, closeHref }: { o: OrderFull; settings: Setting
   );
 }
 
-async function HandOver({ o, settings }: { o: OrderFull; settings: Settings }) {
+async function HandOver({ o, settings, multi }: { o: OrderFull; settings: Settings; multi: boolean }) {
   const [weavers, load] = await Promise.all([getWeavers(), weaverLoad()]);
   const wDefault = o.weaver_promised ?? addDays(today(), 21);
+  const lines = o.lines.map((l, idx) => ({ idx, desc: l.desc, heading: !!l.heading, unit: l.unit })).filter((l) => !l.heading || l.unit).map(({ idx, desc }) => ({ idx, desc }));
   return (
     <>
-      <div className="field">
-        Which weaver?
-        {weavers.length ? (
-          <div className="chips">
-            {weavers.map((w) => (
-              <label className="chip" key={w.id}>
-                <input type="radio" name="weaver_id" value={w.id} defaultChecked={o.weaver_id === w.id} />
-                <span>{w.name} <span style={{ opacity: 0.6, fontWeight: 400 }}>· {load[w.id] ?? 0}</span></span>
-              </label>
-            ))}
-          </div>
-        ) : null}
-        <span className="hint">The number is how many orders each one is weaving now.</span>
-      </div>
-      <label className="field">Or a new weaver <span className="hint">added to her list</span><input name="weaver_new" placeholder="Name" autoComplete="off" /></label>
-      <DatePair weaver={wDefault} client={o.client_promised ?? ""} buffer={settings.buffer_days} />
+      <WeaverSplit
+        weavers={weavers.map((w) => ({ id: w.id, name: w.name, load: load[w.id] ?? 0 }))}
+        lines={lines}
+        buffer={settings.buffer_days}
+        defaultDate={wDefault}
+        clientDate={o.client_promised ?? ""}
+        multi={multi}
+      />
+      <span className="hint small mut">The number next to a name is how many jobs they&apos;re weaving now.</span>
       <label className="field">First check-in call<input type="date" name="next_call" defaultValue={addDays(today(), settings.call_every_days)} /></label>
       <SubmitButton className="btn block">Start weaving</SubmitButton>
-      <p className="mut small" style={{ margin: 0, textAlign: "center" }}>The client&apos;s page will say &ldquo;On the loom&rdquo; with the client date.</p>
+      {!multi ? <Link href={`/orders/${o.id}?step=1&split=1`} className="linkbtn small" style={{ alignSelf: "center", fontWeight: 500 }} scroll={false} replace>Split between weavers instead</Link> : null}
     </>
   );
 }
 
-function LogSheet({ o, kind, settings, closeHref }: { o: OrderFull; kind: string; settings: Settings; closeHref: string }) {
+function LogSheet({ o, kind, settings, closeHref, share }: { o: OrderFull; kind: string; settings: Settings; closeHref: string; share?: string }) {
+  const open = o.assignments.filter((a) => !a.received_at);
+  const picked = open.find((a) => a.id === share) ?? (open.length === 1 ? open[0] : undefined);
   const k = ["weaver", "client", "note"].includes(kind) ? kind : "note";
   const t = today();
   const every = settings.call_every_days;
@@ -348,6 +373,19 @@ function LogSheet({ o, kind, settings, closeHref }: { o: OrderFull; kind: string
           ))}
         </div>
         <input type="hidden" name="kind" value={k} />
+        {k === "weaver" && open.length > 1 ? (
+          <div className="field">
+            Which weaver did you call?
+            <div className="chips">
+              {open.map((a) => (
+                <label className="chip" key={a.id}>
+                  <input type="radio" name="assignment_id" value={a.id} required defaultChecked={picked?.id === a.id} />
+                  <span>{a.weaver?.name ?? "Weaver"}{a.items ? <span style={{ opacity: 0.6, fontWeight: 400 }}> · {a.items}</span> : null}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        ) : picked ? <input type="hidden" name="assignment_id" value={picked.id} /> : null}
         <label className="field">{k === "weaver" ? "What did the weaver say?" : k === "client" ? "What did you send?" : "Note"}
           <textarea name="body" placeholder={k === "weaver" ? "e.g. Half done, on track" : ""} />
         </label>
@@ -549,5 +587,40 @@ function DepositPaidSheet({ o, closeHref }: { o: OrderFull; closeHref: string })
         <Link href={`${closeHref}?invoice=1`} className="btn quiet block" scroll={false} replace>Back</Link>
       </form>
     </Sheet>
+  );
+}
+
+/** An order split across weavers: each share with its own date, calls and "received". */
+function Shares({ o, self }: { o: OrderFull; self: string }) {
+  const t = today();
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      {o.assignments.map((a) => {
+        const due = a.next_call && a.next_call <= t && !a.received_at;
+        return (
+          <div key={a.id} className="kv" style={{ alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ flex: "1 1 200px", minWidth: 0 }}>
+              <div style={{ fontWeight: 600 }}>{a.weaver?.name ?? "Weaver"}</div>
+              <div className="mut small">{a.items || "—"}</div>
+              <div className="small">
+                {a.received_at ? <span style={{ color: "var(--ok)" }}>Received {shortDate(a.received_at)}</span> : (
+                  <>due {shortDate(a.weaver_promised)} · <span className={due ? "hot" : "mut"}>next call {a.next_call ? relativeDay(a.next_call) : "—"}</span></>
+                )}
+              </div>
+            </div>
+            {!a.received_at ? (
+              <div style={{ display: "flex", gap: 8 }}>
+                <Link href={`${self}?log=weaver&a=${a.id}`} className={`btn sm ${due ? "" : "quiet"}`} scroll={false}>Called</Link>
+                <form action={receiveShare}>
+                  <input type="hidden" name="id" value={o.id} />
+                  <input type="hidden" name="assignment_id" value={a.id} />
+                  <SubmitButton className="btn ghost sm" pendingText="Saving…">Received</SubmitButton>
+                </form>
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
   );
 }
