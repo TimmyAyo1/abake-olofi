@@ -11,7 +11,7 @@ import type { OrderFull, Settings } from "./types";
 
 const fontPath = (f: string) => path.join(process.cwd(), "app", "fonts", f);
 let ready = false;
-function setup() {
+export function setup() {
   if (ready) return;
   Font.register({
     family: "Inter",
@@ -26,10 +26,10 @@ function setup() {
   ready = true;
 }
 
-const INK = "#3a3a3a";
-const SOFT = "#5a5a5a";
+export const INK = "#3a3a3a";
+export const SOFT = "#5a5a5a";
 
-const s = StyleSheet.create({
+export const s = StyleSheet.create({
   page: { fontFamily: "Inter", color: INK, paddingTop: 64, paddingBottom: 56, paddingHorizontal: 58, fontSize: 9 },
   top: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   title: { fontSize: 32, fontWeight: 700, letterSpacing: 5 },
@@ -57,8 +57,8 @@ const s = StyleSheet.create({
   foot: { position: "absolute", bottom: 30, left: 58, right: 58, fontSize: 7.5, color: "#8a8a8a", textAlign: "center", letterSpacing: 0.6 },
 });
 
-const n = (v: number) => Math.round(v).toLocaleString("en-NG");
-const dmy = (d: string) => `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}`;
+export const n = (v: number) => Math.round(v).toLocaleString("en-NG");
+export const dmy = (d: string) => `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}`;
 
 function InvoiceDoc({ o, settings, logo }: { o: OrderFull; settings: Settings; logo: Buffer | null }) {
   const m = money(o);
@@ -156,4 +156,8 @@ export async function invoicePdf(o: OrderFull, settings: Settings): Promise<Buff
 export function invoiceFileName(o: OrderFull) {
   const no = o.invoice_no ? String(o.invoice_no).padStart(5, "0") : o.ref;
   return `Invoice ${no} - ${o.client_name}.pdf`.replace(/[\\/:*?"<>|]/g, "");
+}
+
+export function readLogo(): Buffer | null {
+  try { return fs.readFileSync(path.join(process.cwd(), "public", "logo.png")); } catch { return null; }
 }

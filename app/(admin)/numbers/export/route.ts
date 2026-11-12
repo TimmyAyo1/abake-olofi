@@ -1,10 +1,12 @@
-import { getOrders } from "@/lib/data";
+import { getBanks, getOrders, getSales } from "@/lib/data";
+import { buyer, receiptNo, saleMoney, saleSummary } from "@/lib/sales";
 import { money, stageLabel } from "@/lib/orders";
 import { today } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
+  if (new URL(req.url).searchParams.has("sales")) return salesCsv();
   const orders = await getOrders();
   const head = [
     "Ref", "Client", "Phone", "Source", "Order", "Stage", "Cancelled", "Created", "Invoiced", "Deposit", "With weaver",
@@ -26,6 +28,24 @@ export async function GET() {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="abake-olofi-orders-${today()}.csv"`,
+    },
+  });
+}
+
+async function salesCsv() {
+  const [sales, banks] = await Promise.all([getSales(), getBanks()]);
+  const q = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const head = ["Receipt", "Date", "Customer", "Phone", "How they bought", "Items", "Subtotal", "Discount", "Paid", "Paid into", "Note"];
+  const rows = sales.map((x) => {
+    const m = saleMoney(x);
+    const bank = banks.find((b) => b.id === x.bank_account_id);
+    return [receiptNo(x), x.sold_on, buyer(x), x.customer_phone, x.channel, saleSummary(x), m.subtotal, m.discount || "", x.total, bank?.bank_name, x.note].map(q).join(",");
+  });
+  const csv = "\uFEFF" + [head.map(q).join(","), ...rows].join("\n");
+  return new Response(csv, {
+    headers: {
+      "Content-Type": "text/csv; charset=utf-8",
+      "Content-Disposition": `attachment; filename="abake-olofi-sales-${today()}.csv"`,
     },
   });
 }

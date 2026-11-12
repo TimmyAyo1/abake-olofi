@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 
 const ITEMS = [
   { href: "/orders", label: "Orders", icon: "M4 6h16M4 12h16M4 18h10" },
+  { href: "/sales", label: "Sales", icon: "M5 8h14l-1.2 12H6.2zM9 8V6.5a3 3 0 0 1 6 0V8" },
+  { href: "/clients", label: "Clients", icon: "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 4.6a3.5 3.5 0 0 1 0 6.3M18 14.3c1.8.8 3 2.9 3 5.7" },
   { href: "/weavers", label: "Weavers", icon: "M4 6h16M4 10h16M4 14h16M4 18h16M8 4v16M16 4v16" },
   { href: "/money", label: "Money", icon: "M3 7h18v10H3zM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5" },
   { href: "/numbers", label: "Numbers", icon: "M5 20V11M12 20V5M19 20v-6" },

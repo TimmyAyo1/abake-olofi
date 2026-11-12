@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "./supabase/server";
-import type { Bank, OrderFull, OrderUpdate, Settings, Template, Weaver } from "./types";
+import type { Bank, OrderFull, OrderUpdate, Sale, Settings, Template, Weaver } from "./types";
 
 const ORDER_SELECT = "*, weaver:weavers(id, name, phone), payments(*), assignments:order_assignments(*, weaver:weavers(id, name, phone))";
 const ORDER_SELECT_OLD = "*, weaver:weavers(id, name, phone), payments(*)"; // before migration 006
@@ -105,4 +105,18 @@ export async function getBanks(): Promise<Bank[]> {
   const supabase = await createClient();
   const { data } = await supabase.from("bank_accounts").select("id, bank_name, account_name, account_number, is_default").order("created_at");
   return (data ?? []) as Bank[];
+}
+
+/** Stock sales, newest first. Empty (not an error) until migration 007 has been run. */
+export async function getSales(): Promise<Sale[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("sales").select("*").order("sold_on", { ascending: false }).order("created_at", { ascending: false });
+  if (error) return [];
+  return (data ?? []) as Sale[];
+}
+
+export async function getSale(id: string): Promise<Sale | null> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("sales").select("*").eq("id", id).maybeSingle();
+  return (data as Sale) ?? null;
 }

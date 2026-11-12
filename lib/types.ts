@@ -116,3 +116,20 @@ export type Assignment = {
 };
 
 export type Bank = { id: string; bank_name: string; account_name: string | null; account_number: string; is_default: boolean };
+
+/** A sale from what's already made: paid on the spot, with a receipt. */
+export type SaleLine = { desc: string; per: string; qty: number; unit: number };
+export type Sale = {
+  id: string;
+  receipt_no: number | null;
+  customer_name: string | null;
+  customer_phone: string | null;
+  channel: string | null;
+  lines: SaleLine[];
+  discount: number;
+  total: number;
+  sold_on: string;
+  bank_account_id: string | null;
+  note: string | null;
+  created_at: string;
+};

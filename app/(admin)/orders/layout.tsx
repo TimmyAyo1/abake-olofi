@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SplitView, RowLink } from "@/components/SplitView";
 import { Swatch } from "@/components/Swatch";
+import { Filtered, type FItem } from "@/components/Filters";
 import { getOrders, signMedia } from "@/lib/data";
 import { groupOrders, money } from "@/lib/orders";
 import { daysLeft, naira, relativeDay, shortDate, waLink, today } from "@/lib/format";
@@ -13,6 +14,22 @@ export default async function OrdersLayout({ children }: { children: React.React
   const live = orders.filter((o) => !o.cancelled && o.stage !== "delivered");
   const toCall = groups.find((g) => g.key === "call")?.orders.length ?? 0;
   const owed = orders.filter((o) => !o.cancelled && o.stage === "delivered" && money(o).balance > 0).length;
+
+  // Every order once, with what it can be filtered by. Finished and cancelled ones only show when asked for.
+  const groupOf = new Map<string, string>();
+  groups.forEach((g) => g.orders.forEach((o) => groupOf.set(o.id, g.key)));
+  const ordered = [...groups.flatMap((g) => g.orders), ...orders.filter((o) => !groupOf.has(o.id))]; // keeps each group's own order
+  const items: FItem[] = ordered.map((o) => {
+    const m = money(o);
+    const group = o.cancelled ? "cancelled" : groupOf.get(o.id) ?? "done";
+    const tags: string[] = [group];
+    if (o.cancelled || group === "done") tags.push("_archive");
+    if (group === "call") tags.push("weaving");
+    if (o.stage === "delivered" && !o.cancelled) tags.push("delivered");
+    if (!o.cancelled && o.stage !== "enquiry" && m.total > 0) tags.push(m.balance > 0 ? "balance" : "paid");
+    const text = [o.client_name, o.ref, o.title, o.client_phone, m.invoiceNo, o.weaver?.name, ...(o.assignments ?? []).map((a) => a.weaver?.name)].filter(Boolean).join(" ");
+    return { id: o.id, group, tags, text, date: o.created_at.slice(0, 10), amount: m.balance, node: <Row o={o} group={group} cover={o.cover_path ? covers[o.cover_path] : null} /> };
+  });
 
   const list = (
     <div style={{ display: "flex", flexDirection: "column" }}>
@@ -35,15 +52,29 @@ export default async function OrdersLayout({ children }: { children: React.React
         </div>
       ) : null}
 
-      {groups.map((g) => (
-        <div key={g.key}>
-          <div className={`section-h label${g.hot ? " hot" : ""}`}>
-            <span style={{ display: "flex", gap: 8, alignItems: "center" }}>{g.hot ? <span className="dot" /> : null}{g.label}</span>
-            <span>{String(g.orders.length).padStart(2, "0")}</span>
-          </div>
-          {g.orders.map((o) => <Row key={o.id} o={o} group={g.key} cover={o.cover_path ? covers[o.cover_path] : null} />)}
-        </div>
-      ))}
+      {orders.length ? (
+        <Filtered
+          items={items}
+          groups={[...groups.map((g) => ({ key: g.key, label: g.label, hot: g.hot })), { key: "done", label: "Delivered · paid in full" }, { key: "cancelled", label: "Cancelled" }]}
+          chips={[
+            { key: "all", label: "All" },
+            { key: "ready", label: "In the shop" },
+            { key: "call", label: "To call" },
+            { key: "weaving", label: "With weaver" },
+            { key: "handover", label: "To hand over" },
+            { key: "deposit", label: "Awaiting deposit" },
+            { key: "talking", label: "Talking" },
+            { key: "balance", label: "Owes balance" },
+            { key: "paid", label: "Fully paid" },
+            { key: "delivered", label: "Delivered" },
+            { key: "cancelled", label: "Cancelled" },
+          ]}
+          search="Search client, order or weaver"
+          dates="Added"
+          noun={["order", "orders"]}
+          empty="No orders match."
+        />
+      ) : null}
     </div>
   );
 
@@ -85,6 +116,11 @@ function Row({ o, group, cover }: { o: OrderFull; group: string; cover: string |
         <div className={`small ${late ? "hot" : "mut"}`}>{daysLeft(o.client_promised)}</div>
       </div>
     ) : null;
+  } else if (group === "done") {
+    sub = [o.title, `delivered ${relativeDay(o.delivered_at)}`].filter(Boolean).join(" · ");
+    end = <div className="num mut">{naira(money(o).total)}</div>;
+  } else if (group === "cancelled") {
+    sub = [o.title, "cancelled"].filter(Boolean).join(" · ");
   } else if (group === "owed") {
     sub = `Delivered ${relativeDay(o.delivered_at)}`;
     end = <div className="num" style={{ fontWeight: 600 }}>{naira(money(o).balance)}</div>;

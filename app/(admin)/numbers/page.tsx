@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { getOrders } from "@/lib/data";
+import { getOrders, getSales } from "@/lib/data";
 import { SOURCES } from "@/lib/orders";
 import { naira, today } from "@/lib/format";
-import type { OrderFull } from "@/lib/types";
+import type { OrderFull, Sale } from "@/lib/types";
 
 export const metadata = { title: "Numbers" };
 
@@ -14,7 +14,7 @@ function shift(ym: string, n: number) {
   return d.toISOString().slice(0, 7);
 }
 
-function monthStats(orders: OrderFull[], ym: string) {
+function monthStats(orders: OrderFull[], sales: Sale[], ym: string) {
   const inM = (d: string | null | undefined) => !!d && d.startsWith(ym);
   const started = orders.filter((o) => inM(o.deposit_at));
   const delivered = orders.filter((o) => inM(o.delivered_at));
@@ -25,23 +25,26 @@ function monthStats(orders: OrderFull[], ym: string) {
   const moneyOut = pays.filter((p) => p.direction === "out").reduce((a, p) => a + Number(p.amount), 0);
   const rated = orders.filter((o) => o.feedback_at && inM(o.feedback_at.slice(0, 10)));
   const loved = rated.filter((o) => o.feedback_product === "loved").length;
-  return { started: started.length, delivered: delivered.length, onTime, withDate: withDate.length, moneyIn, moneyOut, kept: moneyIn - moneyOut, rated: rated.length, loved };
+  const sold = sales.filter((x) => inM(x.sold_on));
+  const salesIn = sold.reduce((a, x) => a + Number(x.total), 0);
+  return { sales: sold.length, salesIn, allIn: moneyIn + salesIn, started: started.length, delivered: delivered.length, onTime, withDate: withDate.length, moneyIn, moneyOut, kept: moneyIn - moneyOut, rated: rated.length, loved };
 }
 
 export default async function NumbersPage(props: { searchParams: Promise<{ m?: string }> }) {
   const searchParams = await props.searchParams;
-  const orders = (await getOrders()).filter((o) => !o.cancelled);
+  const [all, sales] = await Promise.all([getOrders(), getSales()]);
+  const orders = all.filter((o) => !o.cancelled);
   const now = today().slice(0, 7);
   const ym = /^\d{4}-\d{2}$/.test(searchParams.m ?? "") ? searchParams.m! : now;
-  const s = monthStats(orders, ym);
+  const s = monthStats(orders, sales, ym);
 
   const last6 = Array.from({ length: 6 }, (_, k) => shift(ym, k - 5));
-  const bars = last6.map((m) => ({ m, v: monthStats(orders, m).moneyIn }));
+  const bars = last6.map((m) => ({ m, v: monthStats(orders, sales, m).allIn }));
   const max = Math.max(1, ...bars.map((b) => b.v));
 
   const last12 = Array.from({ length: 12 }, (_, k) => shift(now, -k));
-  const table = last12.map((m) => ({ m, ...monthStats(orders, m) })).filter((r) => r.started || r.delivered || r.moneyIn);
-  const best = table.reduce((b, r) => (r.moneyIn > (b?.moneyIn ?? 0) ? r : b), null as (typeof table)[number] | null);
+  const table = last12.map((m) => ({ m, ...monthStats(orders, sales, m) })).filter((r) => r.started || r.delivered || r.allIn);
+  const best = table.reduce((b, r) => (r.allIn > (b?.allIn ?? 0) ? r : b), null as (typeof table)[number] | null);
 
   const enquiries = orders.filter((o) => o.created_at.slice(0, 7) === ym);
   const sources = SOURCES.map((src) => {
@@ -64,12 +67,14 @@ export default async function NumbersPage(props: { searchParams: Promise<{ m?: s
         <div className="stat"><span className="v num">{s.started}</span><span className="k">Orders started</span></div>
         <div className="stat"><span className="v num">{s.delivered}</span><span className="k">Delivered</span></div>
         <div className="stat"><span className="v num">{s.withDate ? `${s.onTime} of ${s.withDate}` : "—"}</span><span className="k">Delivered on the promised date</span></div>
-        <div className="stat"><span className="v num">{naira(s.moneyIn)}</span><span className="k">Money in</span></div>
+        <div className="stat"><span className="v num">{naira(s.moneyIn)}</span><span className="k">Money in · custom orders</span></div>
+        <div className="stat"><span className="v num">{naira(s.salesIn)}</span><span className="k">Ready-made sales{s.sales ? ` · ${s.sales}` : ""}</span></div>
+        <div className="stat"><span className="v num">{naira(s.allIn)}</span><span className="k">All money in</span></div>
         <div className="stat"><span className="v num">{s.rated ? `${s.loved} of ${s.rated}` : "—"}</span><span className="k">Clients who loved it</span></div>
       </div>
 
       <section>
-        <div className="label">Money in, last 6 months</div>
+        <div className="label">All money in, last 6 months</div>
         <div className="bars" role="img" aria-label="Money received in each of the last six months">
           {bars.map((b) => (
             <div key={b.m} className={`bar ${b.m === ym ? "cur" : ""}`}>
@@ -86,20 +91,22 @@ export default async function NumbersPage(props: { searchParams: Promise<{ m?: s
         {table.length ? (
           <div className="table-wrap">
             <table className="num">
-              <thead><tr><th>Month</th><th className="r">Started</th><th className="r">Money in</th><th className="r">On time</th></tr></thead>
+              <thead><tr><th>Month</th><th className="r">Started</th><th className="r">Orders</th><th className="r">Sales</th><th className="r">All in</th><th className="r">On time</th></tr></thead>
               <tbody>
                 {table.map((r) => (
                   <tr key={r.m}>
                     <td><Link href={`/numbers?m=${r.m}`} style={{ textDecoration: "underline" }}>{monthName(r.m)}</Link>{best && best.m === r.m && table.length > 1 ? <span className="hot small"> · best</span> : null}</td>
                     <td className="r">{r.started}</td>
                     <td className="r">{naira(r.moneyIn)}</td>
+                    <td className="r">{naira(r.salesIn)}</td>
+                    <td className="r" style={{ fontWeight: 600 }}>{naira(r.allIn)}</td>
                     <td className="r">{r.withDate ? `${r.onTime}/${r.withDate}` : "—"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        ) : <p className="mut">Months fill in as orders and payments are recorded.</p>}
+        ) : <p className="mut">Months fill in as orders, payments and sales are recorded.</p>}
       </section>
 
       <section>
@@ -110,8 +117,11 @@ export default async function NumbersPage(props: { searchParams: Promise<{ m?: s
       </section>
 
       <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <a href={`/numbers/export`} className="btn ghost" style={{ alignSelf: "flex-start" }}>Download all records (CSV)</a>
-        <span className="mut small">Every order, payment and date in a spreadsheet. Keep it with the bank statements.</span>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <a href={`/numbers/export`} className="btn ghost">Download orders (CSV)</a>
+          <a href={`/numbers/export?sales=1`} className="btn ghost">Download sales (CSV)</a>
+        </div>
+        <span className="mut small">Every order, payment, sale and date in a spreadsheet. Keep them with the bank statements.</span>
       </section>
     </div>
   );

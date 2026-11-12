@@ -3,6 +3,7 @@ import { getBanks, getOrders } from "@/lib/data";
 import { bankFor, money } from "@/lib/orders";
 import { naira, relativeDay, shortDate, waLink } from "@/lib/format";
 import { CopyButton } from "@/components/Client";
+import { Filtered, type FItem } from "@/components/Filters";
 import type { Bank, OrderFull } from "@/lib/types";
 
 export const metadata = { title: "Money" };
@@ -53,6 +54,12 @@ export default async function MoneyPage() {
     );
   }
 
+  function item(o: OrderFull, tone: "now" | "overdue" | "later"): FItem {
+    const tags: string[] = [tone];
+    if (!waLink(o.client_phone)) tags.push("nophone");
+    return { id: o.id, group: tone, tags, text: [o.client_name, o.ref, o.title, o.client_phone].filter(Boolean).join(" "), amount: money(o).balance, node: <Row o={o} tone={tone} /> };
+  }
+
   return (
     <div className="page">
       <h1 className="page-title">Money</h1>
@@ -65,26 +72,30 @@ export default async function MoneyPage() {
 
       {owing.length === 0 ? <div className="empty">Nobody owes anything right now.</div> : null}
 
-      {collectNow.length ? (
-        <section>
-          <div className="section-h label hot"><span style={{ display: "flex", gap: 8, alignItems: "center" }}><span className="dot" />Ready in the shop · collect before delivery</span><span>{String(collectNow.length).padStart(2, "0")}</span></div>
-          <p className="mut small" style={{ margin: "4px 0 2px" }}>These are back from the weaver. Ask for the balance before sending them out.</p>
-          {collectNow.map((o) => <Row key={o.id} o={o} tone="now" />)}
-        </section>
-      ) : null}
-
-      {overdue.length ? (
-        <section>
-          <div className="section-h label hot"><span>Delivered · still owing</span><span>{String(overdue.length).padStart(2, "0")}</span></div>
-          {overdue.map((o) => <Row key={o.id} o={o} tone="overdue" />)}
-        </section>
-      ) : null}
-
-      {later.length ? (
-        <section>
-          <div className="section-h label"><span>Still being made · balance due when ready</span><span>{String(later.length).padStart(2, "0")}</span></div>
-          {later.map((o) => <Row key={o.id} o={o} tone="later" />)}
-        </section>
+      {owing.length ? (
+        <Filtered
+          items={[
+            ...collectNow.map((o) => item(o, "now")),
+            ...overdue.map((o) => item(o, "overdue")),
+            ...later.map((o) => item(o, "later")),
+          ]}
+          groups={[
+            { key: "now", label: "Ready in the shop · collect before delivery", hot: true, note: "These are back from the weaver. Ask for the balance before sending them out." },
+            { key: "overdue", label: "Delivered · still owing", hot: true },
+            { key: "later", label: "Still being made · balance due when ready" },
+          ]}
+          chips={[
+            { key: "all", label: "All" },
+            { key: "now", label: "Collect now" },
+            { key: "overdue", label: "Delivered, still owing" },
+            { key: "later", label: "Still being made" },
+            { key: "nophone", label: "No WhatsApp number" },
+          ]}
+          search="Search client or order"
+          noun={["client", "clients"]}
+          money="owed"
+          empty="Nobody matches."
+        />
       ) : null}
 
       <p className="mut small">Attach the bank-alert screenshot to each payment so every figure matches the bank. Add a client&apos;s WhatsApp number to open the chat straight from here.</p>
