@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { SubmitButton } from "@/components/SubmitButton";
 import { Sheet } from "@/components/Sheet";
 import { Filtered, type FItem } from "@/components/Filters";
-import { shortDate, today } from "@/lib/format";
+import { daysLeft, shortDate, today } from "@/lib/format";
 import { addWeaver, deleteWeaver, renameWeaver, setWeaverActive } from "./actions";
 
 export const metadata = { title: "Weavers" };
@@ -51,6 +51,10 @@ export default async function WeaversPage(props: { searchParams: Promise<{ edit?
       return {
         id: w.id, group: "active", tags,
         text: [w.name, ...list.map((o) => `${o.client_name} ${o.title ?? ""}`)].join(" "),
+        views: {
+          late: <WeaverBlock w={w} list={list.filter((o) => o.weaver_promised && o.weaver_promised < t)} note="late" />,
+          call: <WeaverBlock w={w} list={list.filter((o) => o.next_call && o.next_call <= t)} note="to call" />,
+        },
         node: (
           <section style={{ borderTop: "1px solid var(--rule)", padding: "14px 0 6px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
@@ -92,6 +96,7 @@ export default async function WeaversPage(props: { searchParams: Promise<{ edit?
 
       {weavers.length ? (
         <Filtered
+          store="weavers"
           items={items}
           groups={[{ key: "active", label: "" }, { key: "resting", label: "Not active" }]}
           chips={[
@@ -147,5 +152,26 @@ export default async function WeaversPage(props: { searchParams: Promise<{ edit?
         </Sheet>
       ) : null}
     </div>
+  );
+}
+
+/** A weaver with just some of their orders (the late ones, or the ones to call about today). */
+function WeaverBlock({ w, list, note }: { w: { id: string; name: string }; list: { id: string; client_name: string; title: string | null; weaver_promised: string | null }[]; note: string }) {
+  const t = today();
+  return (
+    <section style={{ borderTop: "1px solid var(--rule)", padding: "14px 0 6px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+        <Link href={`/weavers?edit=${w.id}`} className="display" style={{ fontSize: 24 }}>{w.name}</Link>
+        <span className={note === "late" ? "hot" : "mut"} style={{ fontWeight: 600 }}>{list.length} {note}</span>
+      </div>
+      {list.map((o) => (
+        <Link key={o.id + (o.title ?? "")} href={`/orders/${o.id}`} className="kv" style={{ borderTopColor: "var(--line)" }}>
+          <span>{o.client_name}{o.title ? <span className="mut"> · {o.title}</span> : null}</span>
+          <span className={`small ${o.weaver_promised && o.weaver_promised < t ? "hot" : "mut"}`}>
+            {o.weaver_promised && o.weaver_promised < t ? `due ${shortDate(o.weaver_promised)} · ${daysLeft(o.weaver_promised)}` : `due ${shortDate(o.weaver_promised)}`}
+          </span>
+        </Link>
+      ))}
+    </section>
   );
 }

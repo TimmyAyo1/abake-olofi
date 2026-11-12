@@ -10,7 +10,7 @@ const ITEMS = [
   { href: "/weavers", label: "Weavers", icon: "M4 6h16M4 10h16M4 14h16M4 18h16M8 4v16M16 4v16" },
   { href: "/money", label: "Money", icon: "M3 7h18v10H3zM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5" },
   { href: "/numbers", label: "Numbers", icon: "M5 20V11M12 20V5M19 20v-6" },
-  { href: "/templates", label: "Templates", icon: "M6 3h12v18H6zM9 8h6M9 12h6M9 16h4", desktopOnly: true },
+  // Templates is parked for now (the page still works at /templates if it is ever needed again).
   { href: "/settings", label: "Settings", icon: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1", desktopOnly: true },
 ];
 

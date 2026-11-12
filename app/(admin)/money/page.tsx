@@ -56,7 +56,6 @@ export default async function MoneyPage() {
 
   function item(o: OrderFull, tone: "now" | "overdue" | "later"): FItem {
     const tags: string[] = [tone];
-    if (!waLink(o.client_phone)) tags.push("nophone");
     return { id: o.id, group: tone, tags, text: [o.client_name, o.ref, o.title, o.client_phone].filter(Boolean).join(" "), amount: money(o).balance, node: <Row o={o} tone={tone} /> };
   }
 
@@ -74,6 +73,7 @@ export default async function MoneyPage() {
 
       {owing.length ? (
         <Filtered
+          store="money"
           items={[
             ...collectNow.map((o) => item(o, "now")),
             ...overdue.map((o) => item(o, "overdue")),
@@ -89,7 +89,6 @@ export default async function MoneyPage() {
             { key: "now", label: "Collect now" },
             { key: "overdue", label: "Delivered, still owing" },
             { key: "later", label: "Still being made" },
-            { key: "nophone", label: "No WhatsApp number" },
           ]}
           search="Search client or order"
           noun={["client", "clients"]}

@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import { naira } from "@/lib/format";
 import { CHANNELS, UNITS } from "@/lib/sales";
 import type { Bank } from "@/lib/types";
+import { DatePicker } from "./DatePicker";
 
 type Row = { desc: string; per: string; qty: number; unit: number };
 const blank = (): Row => ({ desc: "", per: "piece", qty: 1, unit: 0 });
@@ -89,7 +90,7 @@ export function SaleForm({ action, banks, today }: { action: (fd: FormData) => v
       <details className="more">
         <summary>More details <span className="mut small" style={{ fontWeight: 400, marginLeft: 8, marginRight: "auto" }}>optional</span></summary>
         <div className="stack-in">
-          <label className="field">Date sold<input type="date" name="sold_on" defaultValue={today} max={today} /></label>
+          <label className="field">Date sold<DatePicker name="sold_on" defaultValue={today} max={today} required /></label>
           <label className="field">WhatsApp number <span className="hint">to send the receipt</span><input name="customer_phone" inputMode="tel" placeholder="080…" /></label>
           <label className="field">Note<input name="note" placeholder="e.g. Paid cash, collected by her sister" /></label>
         </div>

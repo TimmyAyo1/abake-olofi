@@ -434,3 +434,87 @@ a[href] *, button * { cursor: inherit; }
 @media (max-width: 767px) {
   .tab { letter-spacing: 0.04em; font-size: 10.5px; }
 }
+
+/* ───────── Date picker (brand calendar instead of the browser's) */
+.dp { position: relative; display: block; }
+.dp-btn {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  font: inherit; font-size: 16px; text-align: left; color: var(--ink); cursor: pointer;
+  background: var(--field); border: 1px solid var(--field-line); border-radius: var(--r); padding: 11px 12px;
+}
+.dp-btn:hover { border-color: var(--ink); }
+.dp-btn:focus-visible, .dp-btn[aria-expanded="true"] { outline: none; border-color: var(--acc); box-shadow: 0 0 0 3px var(--acc-soft); }
+.dp-btn.empty span { color: var(--mut); }
+.dp-btn svg { width: 18px; height: 18px; color: var(--mut); flex-shrink: 0; }
+.dp-compact .dp-btn { font-size: 14px; padding: 8px 10px; }
+.dp .dp-req { position: absolute; left: 12px; bottom: 0; width: 1px; height: 1px; padding: 0; border: 0; opacity: 0; pointer-events: none; }
+.dp-pop {
+  position: fixed; z-index: 120; width: 296px; padding: 14px; color: var(--ink);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: 0 20px 50px rgba(20, 18, 17, 0.16), 0 2px 6px rgba(20, 18, 17, 0.06);
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+.dp-head { display: flex; justify-content: space-between; align-items: center; padding: 0 2px 10px; }
+.dp-head strong { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+.dp-nav { width: 32px; height: 32px; border-radius: 999px; border: 0; background: transparent; color: var(--ink); font-size: 20px; line-height: 1; cursor: pointer; }
+.dp-nav:hover { background: var(--soft); }
+.dp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.dp-wd { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: var(--mut); text-align: center; padding: 4px 0 6px; }
+.dp-day {
+  aspect-ratio: 1; border: 0; border-radius: 999px; background: transparent; color: var(--ink);
+  font: inherit; font-size: 14px; font-variant-numeric: tabular-nums; cursor: pointer; position: relative;
+}
+.dp-day:hover:not(:disabled) { background: var(--soft); }
+.dp-day.today { color: var(--acc-ink); font-weight: 700; }
+.dp-day.today::after { content: ""; position: absolute; left: 50%; bottom: 5px; width: 4px; height: 4px; margin-left: -2px; background: var(--acc); }
+.dp-day.on { background: var(--acc); color: #fff; font-weight: 600; }
+.dp-day.on::after { background: #fff; }
+.dp-day:disabled { color: var(--mut); opacity: 0.35; cursor: default; }
+.dp-day:focus-visible, .dp-nav:focus-visible, .dp-link:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+.dp-foot { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.dp-link { border: 0; background: none; font: inherit; font-size: 14px; font-weight: 600; color: var(--ink); cursor: pointer; padding: 4px 2px; text-decoration: underline; text-underline-offset: 3px; }
+.dp-link.mut { color: var(--mut); }
+.dp-link:disabled { opacity: 0.4; cursor: default; }
+
+/* ───────── List fills the page; an open order/sale sits in a large window over it */
+.fdl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--mut); }
+.split { display: block; height: auto; min-height: 0; overflow: visible; }
+.split-list { width: auto; height: auto; overflow: visible; border-right: 0; max-width: 1080px; margin: 0 auto; padding: 32px 40px 60px; }
+.split-list .page-head { position: sticky; top: 0; z-index: 3; background: var(--bg); padding-top: 14px; margin-top: -14px; padding-bottom: 10px; }
+.main:has(> .split) { padding-bottom: 0; }
+.split-close { display: none; }
+
+@media (min-width: 768px) {
+  .split-overlay { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 4vh 4vw; }
+  .split-backdrop { position: absolute; inset: 0; background: var(--overlay); cursor: default; animation: fade-in 0.15s ease-out; }
+  .split-overlay .split-detail {
+    position: relative; width: min(1120px, 100%); height: 100%; overflow-y: auto; overscroll-behavior: contain;
+    background: var(--bg); border-radius: 16px; box-shadow: 0 30px 80px rgba(20, 18, 17, 0.28);
+    animation: rise-in 0.18s ease-out;
+  }
+  .split-close { display: grid; place-items: center; position: sticky; top: 14px; float: right; margin: 14px 14px 0 0; z-index: 5; background: var(--soft); }
+  .split-overlay .split-detail > .page { margin: 0 auto; }
+  .split-overlay .split-detail .detail-empty { display: none; }
+  html:has(.split-overlay) { overflow: hidden; }
+}
+@media (min-width: 768px) and (max-width: 1023px) { .split-overlay { padding: 2vh 2vw calc(2vh + 70px); } }
+@media (max-width: 767px) {
+  .split-list { padding: 20px 20px 40px; }
+  .split-list .page-head { position: static; margin-top: 0; padding-top: 0; }
+  .split[data-detail="true"] .split-list { display: none; }
+  .main:has(> .split) { padding-bottom: 84px; }
+}
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes rise-in { from { opacity: 0; transform: translateY(10px); } }
+@media (min-width: 768px) { .split-overlay .back-link { display: none; } }
+@media (min-width: 768px) and (max-width: 1023px) { .split-list .page-head { top: 69px; } }
+
+/* Opened from another page: one way back, named after that page */
+.split-backdrop { border: 0; padding: 0; }
+.split-back { display: none; background: none; border: 0; padding: 0; cursor: pointer; font: inherit; }
+.split[data-return] .back-link { display: none; }
+@media (max-width: 767px) {
+  .split-back { display: block; padding: 18px 20px 0; }
+  .split-back + .page { padding-top: 10px; }
+}
+@media (max-width: 767px) { .split-backdrop, .split-close { display: none; } }

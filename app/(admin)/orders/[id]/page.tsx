@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { getBanks, getOrder, getSettings, getUpdates, getWeavers, signMedia, weaverLoad } from "@/lib/data";
 import { STAGES, bankFor, money, stageIndex, stageLabel, withBank } from "@/lib/orders";
-import { addDays, daysLeft, longDate, naira, relativeDay, shortDate, timeAgo, today, waLink } from "@/lib/format";
+import { addDays, daysLeft, longDate, naira, relativeDay, shortDate, timeAgo, today, waLink, lagosDay } from "@/lib/format";
 import type { OrderFull, OrderUpdate, Settings } from "@/lib/types";
 import { Sheet } from "@/components/Sheet";
 import { Swatch } from "@/components/Swatch";
@@ -12,6 +12,7 @@ import { MediaPicker } from "@/components/MediaPicker";
 import { CopyButton, DatePair, Reveal, SharePdf } from "@/components/Client";
 import { WeaverSplit } from "@/components/WeaverSplit";
 import { addPayment, advance, deleteOrders, receiveShare, recordDepositForInvoice, logUpdate, saveInvoiceTerms, toggleCancelled, toggleShared, undoStep } from "../actions";
+import { DatePicker } from "@/components/DatePicker";
 
 type Search = { step?: string; log?: string; pay?: string; invoice?: string; more?: string; delete?: string; err?: string; saved?: string; as?: string; split?: string; a?: string };
 
@@ -36,7 +37,7 @@ export default async function OrderPage(props: { params: Promise<{ id: string }>
   return (
     <div className="od">
       <div className="od-main">
-        <Link href="/orders" className="mut small" style={{ alignSelf: "flex-start" }}>‹ Orders</Link>
+        <Link href="/orders" className="mut small back-link" style={{ alignSelf: "flex-start" }}>‹ Orders</Link>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div className="mut small">{o.ref}{o.source ? ` · came from ${o.source}` : ""}{o.cancelled ? " · cancelled" : ""}</div>
@@ -177,7 +178,7 @@ export default async function OrderPage(props: { params: Promise<{ id: string }>
 }
 
 function sinceText(o: OrderFull) {
-  const d = { enquiry: o.created_at.slice(0, 10), invoiced: o.invoiced_at, deposit: o.deposit_at, weaving: o.weaving_at, ready: o.ready_at, delivered: o.delivered_at }[o.stage];
+  const d = { enquiry: lagosDay(o.created_at), invoiced: o.invoiced_at, deposit: o.deposit_at, weaving: o.weaving_at, ready: o.ready_at, delivered: o.delivered_at }[o.stage];
   return d ? `since ${shortDate(d)}` : "";
 }
 
@@ -279,7 +280,7 @@ function StepSheet({ o, settings, closeHref, split }: { o: OrderFull; settings: 
           <>
             <div className="kv"><span>Invoice total</span><strong className="num">{naira(m.total)}</strong></div>
             {!m.total ? <p className="error">No prices yet. Edit the order to add items first.</p> : null}
-            <label className="field">Date sent<input type="date" name="date" defaultValue={t} required /></label>
+            <label className="field">Date sent<DatePicker name="date" defaultValue={t} required /></label>
             <SubmitButton className="btn block">Mark invoice sent</SubmitButton>
             <Link href={`${closeHref}?invoice=1`} className="btn quiet block" scroll={false}>See the invoice</Link>
           </>
@@ -290,7 +291,7 @@ function StepSheet({ o, settings, closeHref, split }: { o: OrderFull; settings: 
             <p className="mut" style={{ margin: 0 }}>The order becomes official when the deposit lands. Match the amount to the bank alert.</p>
             <div className="grid2">
               <label className="field">Deposit amount<input name="amount" inputMode="numeric" required defaultValue={m.total ? Math.round(m.total / 2) : ""} /></label>
-              <label className="field">Date received<input type="date" name="date" defaultValue={t} required /></label>
+              <label className="field">Date received<DatePicker name="date" defaultValue={t} required /></label>
             </div>
             <div className="field">Bank alert screenshot <span className="hint">optional</span><MediaPicker folder={`orders/${o.id}/payments`} label="Screenshot" max={1} /></div>
             <SubmitButton className="btn block">Record deposit</SubmitButton>
@@ -301,7 +302,7 @@ function StepSheet({ o, settings, closeHref, split }: { o: OrderFull; settings: 
 
         {o.stage === "weaving" ? (
           <>
-            <label className="field">Date received from the weaver<input type="date" name="date" defaultValue={t} required /></label>
+            <label className="field">Date received from the weaver<DatePicker name="date" defaultValue={t} required /></label>
             {m.owedToWeaver > 0 ? (
               <label className="field">Paid to the weaver now <span className="hint">{naira(m.owedToWeaver)} still owed</span><input name="paid_now" inputMode="numeric" defaultValue={m.owedToWeaver} /></label>
             ) : null}
@@ -314,10 +315,10 @@ function StepSheet({ o, settings, closeHref, split }: { o: OrderFull; settings: 
 
         {o.stage === "ready" ? (
           <>
-            <label className="field">Date delivered<input type="date" name="date" defaultValue={t} required /></label>
+            <label className="field">Date delivered<DatePicker name="date" defaultValue={t} required /></label>
             <div className="grid2">
               <label className="field">Balance received<input name="amount" inputMode="numeric" defaultValue={m.balance > 0 ? m.balance : ""} /></label>
-              <label className="field">Date received<input type="date" name="paid_on" defaultValue={t} /></label>
+              <label className="field">Date received<DatePicker name="paid_on" defaultValue={t} /></label>
             </div>
             <div className="field">Delivery photo <span className="hint">optional, shown to the client</span><MediaPicker folder={`orders/${o.id}`} /></div>
             <p className="mut small" style={{ margin: 0 }}>The client&apos;s page will ask how they found the aso-oke and the service.</p>
@@ -344,7 +345,7 @@ async function HandOver({ o, settings, multi }: { o: OrderFull; settings: Settin
         multi={multi}
       />
       <span className="hint small mut">The number next to a name is how many jobs they&apos;re weaving now.</span>
-      <label className="field">First check-in call<input type="date" name="next_call" defaultValue={addDays(today(), settings.call_every_days)} /></label>
+      <label className="field">First check-in call<DatePicker name="next_call" defaultValue={addDays(today(), settings.call_every_days)} /></label>
       <SubmitButton className="btn block">Start weaving</SubmitButton>
       {!multi ? <Link href={`/orders/${o.id}?step=1&split=1`} className="linkbtn small" style={{ alignSelf: "center", fontWeight: 500 }} scroll={false} replace>Split between weavers instead</Link> : null}
     </>
@@ -399,7 +400,7 @@ function LogSheet({ o, kind, settings, closeHref, share }: { o: OrderFull; kind:
                 <label className="chip" key={x.v}><input type="radio" name="next_call" value={x.v} defaultChecked={x.v === defaultNext} /><span>{x.l}</span></label>
               ))}
             </div>
-            <label className="field">Or pick a date<input type="date" name="next_call_pick" min={t} /></label>
+            <label className="field">Or pick a date<DatePicker name="next_call_pick" min={t} /></label>
             <span className="mut small">The order shows under “Weavers to call today” on that day.</span>
           </div>
         ) : null}
@@ -407,8 +408,8 @@ function LogSheet({ o, kind, settings, closeHref, share }: { o: OrderFull; kind:
         {o.stage === "weaving" || o.stage === "ready" ? (
           <Reveal name="date_changed" label="The date changed" hint={`Now: weaver ${shortDate(o.weaver_promised)} · client ${shortDate(o.client_promised)}`}>
             <div className="grid2">
-              <label className="field">Weaver&apos;s new date<input type="date" name="weaver_promised" defaultValue={o.weaver_promised ?? ""} /></label>
-              <label className="field">Tell the client<input type="date" name="client_promised" defaultValue={o.client_promised ?? ""} /></label>
+              <label className="field">Weaver&apos;s new date<DatePicker name="weaver_promised" defaultValue={o.weaver_promised ?? ""} /></label>
+              <label className="field">Tell the client<DatePicker name="client_promised" defaultValue={o.client_promised ?? ""} /></label>
             </div>
             <label className="field">Note for the client <span className="hint">only if their date moves</span><input name="client_date_note" placeholder="e.g. We're adding extra detail to the border" /></label>
           </Reveal>
@@ -433,7 +434,7 @@ function PaySheet({ o, closeHref }: { o: OrderFull; closeHref: string }) {
         <input type="hidden" name="direction" value="in" />
         <div className="grid2">
           <label className="field">Amount<input name="amount" inputMode="numeric" required /></label>
-          <label className="field">Date<input type="date" name="paid_on" defaultValue={today()} required /></label>
+          <label className="field">Date<DatePicker name="paid_on" defaultValue={today()} required /></label>
         </div>
         <div className="field">Bank alert screenshot <span className="hint">optional</span><MediaPicker folder={`orders/${o.id}/payments`} label="Screenshot" max={1} /></div>
         <p className="mut small" style={{ margin: 0 }}>Client balance {naira(m.balance)}{m.weaverCost ? ` · owed to weaver ${naira(m.owedToWeaver)}` : ""}</p>
@@ -580,7 +581,7 @@ function DepositPaidSheet({ o, closeHref }: { o: OrderFull; closeHref: string })
         <input type="hidden" name="id" value={o.id} />
         <div className="grid2">
           <label className="field">Amount paid (₦)<input name="amount" inputMode="numeric" required defaultValue={m.depositDue || ""} /></label>
-          <label className="field">Date paid<input type="date" name="date" defaultValue={today()} required /></label>
+          <label className="field">Date paid<DatePicker name="date" defaultValue={today()} required /></label>
         </div>
         <div className="field">Bank alert screenshot <span className="hint">optional</span><MediaPicker folder={`orders/${o.id}/payments`} label="Screenshot" max={1} /></div>
         <SubmitButton className="btn block">Save and show the invoice</SubmitButton>

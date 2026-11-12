@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { DatePicker } from "./DatePicker";
 
 /**
  * Search + quick filter chips + a date range, for any list.
@@ -11,7 +12,8 @@ import { useSearchParams } from "next/navigation";
  * Opening a page with ?q=… or ?f=… starts with that search or chip.
  */
 
-export type FItem = { id: string; group?: string; tags: string[]; text: string; date?: string | null; amount?: number; node: React.ReactNode };
+/** `views` swaps in a different row for a chip, e.g. a weaver with only their late orders under "Running late". */
+export type FItem = { id: string; group?: string; tags: string[]; text: string; date?: string | null; amount?: number; node: React.ReactNode; views?: Record<string, React.ReactNode> };
 export type FGroup = { key: string; label: string; hot?: boolean; note?: string; showAmount?: boolean };
 export type FChip = { key: string; label: string };
 
@@ -46,7 +48,7 @@ function bounds(r: Range): { from: string; to: string; label: string } | null {
 const naira = (n: number) => "₦" + Math.round(n).toLocaleString("en-NG");
 
 export function Filtered({
-  items, groups = [], chips, search = "Search", dates, noun = ["item", "items"], empty = "Nothing matches.", money,
+  items, groups = [], chips, search = "Search", dates, noun = ["item", "items"], empty = "Nothing matches.", money, store,
 }: {
   items: FItem[];
   groups?: FGroup[];
@@ -58,18 +60,42 @@ export function Filtered({
   empty?: string;
   /** show the total of the shown rows' amounts, e.g. "to collect" */
   money?: string;
+  /** remembers the search and filters for this list while the tab is open, so coming back finds them as left */
+  store?: string;
 }) {
   const sp = useSearchParams();
   const [q, setQ] = useState(() => sp.get("q") ?? "");
   const [chip, setChip] = useState(() => (chips.some((c) => c.key === sp.get("f")) ? sp.get("f")! : "all"));
   const [range, setRange] = useState<Range>({ p: "all" });
+  const key = store ? `abake:filters:${store}` : null;
+  const restored = useRef(false);
+
+  // Come back to the list as it was left (unless the link asked for a search or chip).
+  useEffect(() => {
+    if (!key || restored.current) return;
+    restored.current = true;
+    if (sp.get("q") || sp.get("f")) return;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(key) || "null");
+      if (saved) {
+        if (typeof saved.q === "string") setQ(saved.q);
+        if (chips.some((c) => c.key === saved.chip)) setChip(saved.chip);
+        if (saved.range?.p) setRange(saved.range);
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!key || !restored.current) return;
+    try { sessionStorage.setItem(key, JSON.stringify({ q, chip, range })); } catch {}
+  }, [key, q, chip, range]);
   const [open, setOpen] = useState(false);
   const menu = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent | KeyboardEvent) => {
-      if (e instanceof KeyboardEvent ? e.key === "Escape" : !menu.current?.contains(e.target as Node)) setOpen(false);
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !menu.current?.contains(e.target as Node) && !(e.target as Element).closest?.(".dp-pop")) setOpen(false);
     };
     document.addEventListener("mousedown", close);
     document.addEventListener("keydown", close);
@@ -120,8 +146,8 @@ export function Filtered({
                   ))}
                   {range.p === "custom" ? (
                     <div className="fdates">
-                      <label>From<input className="input" type="date" value={R?.from ?? ""} max={lagosToday()} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} /></label>
-                      <label>To<input className="input" type="date" value={R?.to ?? ""} max={lagosToday()} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} /></label>
+                      <div className="fdl">From<DatePicker compact required value={R?.from ?? ""} max={lagosToday()} onChange={(d) => setRange((r) => ({ ...r, from: d }))} label="From" /></div>
+                      <div className="fdl">To<DatePicker compact required value={R?.to ?? ""} max={lagosToday()} onChange={(d) => setRange((r) => ({ ...r, to: d }))} label="To" /></div>
                     </div>
                   ) : null}
                 </div>
@@ -160,7 +186,7 @@ export function Filtered({
             </div>
           ) : null}
           {g.note ? <p className="mut small" style={{ margin: "4px 0 2px" }}>{g.note}</p> : null}
-          {rows.map((it) => <div key={it.id} className="frow">{it.node}</div>)}
+          {rows.map((it) => <div key={it.id} className="frow">{it.views?.[chip] ?? it.node}</div>)}
         </div>
       ))}
     </div>

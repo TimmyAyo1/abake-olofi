@@ -62,6 +62,7 @@ export default async function SalesLayout({ children }: { children: React.ReactN
 
       {sales.length ? (
         <Filtered
+          store="sales"
           items={items}
           groups={months.map((g) => ({ key: g.ym, label: monthName(g.ym), showAmount: true }))}
           chips={[{ key: "all", label: "All" }, ...CHANNELS.map((c) => ({ key: c, label: c }))]}

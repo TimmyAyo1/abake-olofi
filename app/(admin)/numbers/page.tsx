@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getOrders, getSales } from "@/lib/data";
 import { SOURCES } from "@/lib/orders";
-import { naira, today } from "@/lib/format";
+import { lagosDay, naira, today } from "@/lib/format";
 import type { OrderFull, Sale } from "@/lib/types";
 
 export const metadata = { title: "Numbers" };
@@ -23,7 +23,7 @@ function monthStats(orders: OrderFull[], sales: Sale[], ym: string) {
   const pays = orders.flatMap((o) => o.payments).filter((p) => inM(p.paid_on));
   const moneyIn = pays.filter((p) => p.direction === "in").reduce((a, p) => a + Number(p.amount), 0);
   const moneyOut = pays.filter((p) => p.direction === "out").reduce((a, p) => a + Number(p.amount), 0);
-  const rated = orders.filter((o) => o.feedback_at && inM(o.feedback_at.slice(0, 10)));
+  const rated = orders.filter((o) => o.feedback_at && inM(lagosDay(o.feedback_at)));
   const loved = rated.filter((o) => o.feedback_product === "loved").length;
   const sold = sales.filter((x) => inM(x.sold_on));
   const salesIn = sold.reduce((a, x) => a + Number(x.total), 0);
@@ -46,7 +46,7 @@ export default async function NumbersPage(props: { searchParams: Promise<{ m?: s
   const table = last12.map((m) => ({ m, ...monthStats(orders, sales, m) })).filter((r) => r.started || r.delivered || r.allIn);
   const best = table.reduce((b, r) => (r.allIn > (b?.allIn ?? 0) ? r : b), null as (typeof table)[number] | null);
 
-  const enquiries = orders.filter((o) => o.created_at.slice(0, 7) === ym);
+  const enquiries = orders.filter((o) => lagosDay(o.created_at).slice(0, 7) === ym);
   const sources = SOURCES.map((src) => {
     const e = enquiries.filter((o) => o.source === src);
     return { src, asked: e.length, paid: e.filter((o) => o.deposit_at).length };

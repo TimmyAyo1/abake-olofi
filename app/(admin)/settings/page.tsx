@@ -89,7 +89,6 @@ export default async function SettingsPage(props: { searchParams: Promise<{ save
       </section>
 
       <section className="row-btns">
-        <Link href="/templates" className="btn quiet">Order templates</Link>
         <form action={signOut}><button className="btn ghost" style={{ width: "100%" }}>Sign out{me?.name ? ` (${me.name})` : ""}</button></form>
       </section>
     </div>

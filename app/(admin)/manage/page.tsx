@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getOrders } from "@/lib/data";
 import { stageLabel } from "@/lib/orders";
-import { relativeDay } from "@/lib/format";
+import { relativeDay, lagosDay } from "@/lib/format";
 import { SelectList } from "@/components/SelectList";
 import { deleteOrders } from "../orders/actions";
 
@@ -12,7 +12,7 @@ export default async function ManagePage() {
   const items = orders.map((o) => ({
     id: o.id,
     name: o.client_name,
-    sub: [o.ref, o.title, `added ${relativeDay(o.created_at.slice(0, 10))}`].filter(Boolean).join(" · "),
+    sub: [o.ref, o.title, `added ${relativeDay(lagosDay(o.created_at))}`].filter(Boolean).join(" · "),
     group: o.cancelled ? "Cancelled" : stageLabel(o.stage),
   }));
   return (

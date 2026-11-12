@@ -8,6 +8,7 @@ import { LinesEditor } from "./LinesEditor";
 import { MediaPicker } from "./MediaPicker";
 import { SubmitButton } from "./SubmitButton";
 import { useFormStatus } from "react-dom";
+import { DatePicker } from "./DatePicker";
 
 type Props = {
   action: (fd: FormData) => void;
@@ -72,7 +73,7 @@ export function OrderForm({ action, templates = [], order, repeatOf }: Props) {
       </div>
 
       <label className="field">Proposed delivery date <span className="hint">optional · the client sees this</span>
-        <input type="date" name="client_promised" defaultValue={base.client_promised ?? ""} />
+        <DatePicker name="client_promised" defaultValue={base.client_promised ?? ""} placeholder="No date yet" />
       </label>
 
       <div className="field">

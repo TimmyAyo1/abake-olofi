@@ -4,7 +4,7 @@ import { CopyButton } from "@/components/Client";
 import { Swatch } from "@/components/Swatch";
 import { getOrders, getSales } from "@/lib/data";
 import { money } from "@/lib/orders";
-import { naira, relativeDay, waLink } from "@/lib/format";
+import { lagosDay, naira, relativeDay, waLink } from "@/lib/format";
 
 export const metadata = { title: "Clients" };
 
@@ -28,7 +28,7 @@ export default async function ClientsPage() {
   };
 
   orders.filter((o) => !o.cancelled).forEach((o) => {
-    const c = get(o.client_name, o.client_phone, o.created_at.slice(0, 10));
+    const c = get(o.client_name, o.client_phone, lagosDay(o.created_at));
     const m = money(o);
     c.orders += 1;
     c.spent += m.paidIn;
@@ -97,6 +97,7 @@ export default async function ClientsPage() {
 
       {clients.length ? (
         <Filtered
+          store="clients"
           items={items}
           chips={[
             { key: "all", label: "All" },

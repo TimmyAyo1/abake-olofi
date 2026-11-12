@@ -4,7 +4,7 @@ import { Swatch } from "@/components/Swatch";
 import { Filtered, type FItem } from "@/components/Filters";
 import { getOrders, signMedia } from "@/lib/data";
 import { groupOrders, money } from "@/lib/orders";
-import { daysLeft, naira, relativeDay, shortDate, waLink, today } from "@/lib/format";
+import { daysLeft, lagosDay, naira, relativeDay, shortDate, waLink, today } from "@/lib/format";
 import type { OrderFull } from "@/lib/types";
 
 export default async function OrdersLayout({ children }: { children: React.ReactNode }) {
@@ -28,7 +28,7 @@ export default async function OrdersLayout({ children }: { children: React.React
     if (o.stage === "delivered" && !o.cancelled) tags.push("delivered");
     if (!o.cancelled && o.stage !== "enquiry" && m.total > 0) tags.push(m.balance > 0 ? "balance" : "paid");
     const text = [o.client_name, o.ref, o.title, o.client_phone, m.invoiceNo, o.weaver?.name, ...(o.assignments ?? []).map((a) => a.weaver?.name)].filter(Boolean).join(" ");
-    return { id: o.id, group, tags, text, date: o.created_at.slice(0, 10), amount: m.balance, node: <Row o={o} group={group} cover={o.cover_path ? covers[o.cover_path] : null} /> };
+    return { id: o.id, group, tags, text, date: lagosDay(o.created_at), amount: m.balance, node: <Row o={o} group={group} cover={o.cover_path ? covers[o.cover_path] : null} /> };
   });
 
   const list = (
@@ -54,6 +54,7 @@ export default async function OrdersLayout({ children }: { children: React.React
 
       {orders.length ? (
         <Filtered
+          store="orders"
           items={items}
           groups={[...groups.map((g) => ({ key: g.key, label: g.label, hot: g.hot })), { key: "done", label: "Delivered · paid in full" }, { key: "cancelled", label: "Cancelled" }]}
           chips={[
@@ -87,7 +88,7 @@ function Row({ o, group, cover }: { o: OrderFull; group: string; cover: string |
   let end: React.ReactNode = null;
 
   if (group === "talking") {
-    sub = [o.title, `added ${relativeDay(o.created_at.slice(0, 10))}`].filter(Boolean).join(" · ");
+    sub = [o.title, `added ${relativeDay(lagosDay(o.created_at))}`].filter(Boolean).join(" · ");
   } else if (group === "deposit") {
     sub = `Invoice sent ${relativeDay(o.invoiced_at)}`;
     const wa = waLink(o.client_phone);

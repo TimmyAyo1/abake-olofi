@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { DatePicker } from "./DatePicker";
 
 type W = { id: string; name: string; load: number };
 type L = { idx: number; desc: string };
@@ -94,7 +95,7 @@ export function WeaverSplit({ weavers, lines, buffer, defaultDate, clientDate, m
           ) : null}
 
           <label className="field">Date this weaver confirmed
-            <input type="date" name="a_date" required value={r.date} onChange={(e) => set(r.key, { date: e.target.value })} />
+            <DatePicker name="a_date" required value={r.date} onChange={(d) => set(r.key, { date: d })} />
           </label>
         </div>
       ))}
@@ -113,7 +114,7 @@ export function WeaverSplit({ weavers, lines, buffer, defaultDate, clientDate, m
 
       <label className="field">
         Date to tell the client <span className="hint">{manual ? "set by you" : `latest weaver date + ${buffer} days`}</span>
-        <input type="date" name="client_promised" required value={shownClient} onChange={(e) => { setClient(e.target.value); setManual(true); }} />
+        <DatePicker name="client_promised" required value={shownClient} onChange={(d) => { setClient(d); setManual(true); }} />
       </label>
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DatePicker } from "./DatePicker";
 
 /** Copies text; falls back to selecting it when the clipboard is blocked. */
 export function CopyButton({ text, label, className = "btn quiet" }: { text: string; label: string; className?: string }) {
@@ -40,11 +41,11 @@ export function DatePair({ weaver, client, buffer }: { weaver: string; client: s
     <>
       <label className="field">
         Date the weaver confirmed
-        <input type="date" name="weaver_promised" required value={w} onChange={(e) => { setW(e.target.value); if (!manual) setC(plus(e.target.value, buffer)); }} />
+        <DatePicker name="weaver_promised" required value={w} onChange={(d) => { setW(d); if (!manual && d) setC(plus(d, buffer)); }} />
       </label>
       <label className="field">
         Date to tell the client <span className="hint">Weaver&apos;s date + {buffer} days buffer</span>
-        <input type="date" name="client_promised" required value={c} onChange={(e) => { setC(e.target.value); setManual(true); }} />
+        <DatePicker name="client_promised" required value={c} onChange={(d) => { setC(d); setManual(true); }} />
       </label>
     </>
   );

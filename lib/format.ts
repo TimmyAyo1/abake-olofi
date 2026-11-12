@@ -55,6 +55,12 @@ export function daysLeft(d: string | null | undefined): string {
   return `${-n} day${n === -1 ? "" : "s"} late`;
 }
 
+/** The Lagos calendar day of a timestamp (an order added at 00:30 Lagos time counts for that day, not the day before). */
+export function lagosDay(iso: string | null | undefined): string {
+  if (!iso) return "";
+  return new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date(iso));
+}
+
 export function timeAgo(iso: string): string {
   const d = new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date(iso));
   return relativeDay(d);
